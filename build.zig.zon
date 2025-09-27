@@ -1,0 +1,19 @@
+.{
+    .name = .iroha,
+    .version = "0.0.0",
+    .fingerprint = 0x472cb64aa2c7ec1c, // Changing this has security and trust implications.
+    .minimum_zig_version = "0.15.1",
+    .dependencies = .{
+        .gobject = .{
+            .path = "./zig-out/bindings",
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+        // For example...
+        //"LICENSE",
+        //"README.md",
+    },
+}
