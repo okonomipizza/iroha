@@ -126,14 +126,10 @@ pub const PowerMenu = extern struct {
 
         gtk.Box.append(container, button.as(gtk.Widget));
 
-        // gtk.Box.append(container, button.as(gtk.Widget));
-
-
         const button_child = gtk.Button.getChild(button);
         if (button_child) |child| {
             gtk.Widget.setHalign(child, gtk.Align.start);
         }
-
         
         // Connect button signal with action data
         switch (action) {

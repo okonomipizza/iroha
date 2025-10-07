@@ -212,3 +212,47 @@ popover.power-menu > contents {
     min-height: 16px;
     -gtk-icon-size: 16px;
 }
+
+popover.notification-menu {
+    background: var(--color-transparent);
+    border: none;
+    padding: 0;
+    margin: 0;
+}
+
+popover.notification-menu > contents {
+    background: var(--color-transparent);
+    border: none;
+    padding: 0;
+    margin: 0;
+}
+
+.notification-menu-box {
+    background-color: var(--color-black-dark);
+    backdrop-filter: var(--blur-heavy);
+    border: none;
+    border-radius: var(--border-radius-medium);
+    padding: 8px, 8px;
+    margin: 0;
+    min-width: 250px;
+}
+
+.notification-menu-item {
+    color: var(--color-white);
+    background-color: var(--color-transparent);
+    background: var(--color-transparent);
+    backdrop-filter: var(--blur-heavy);
+    border: none;
+    padding: 4px 16px;
+    margin: 4px 8px;
+    font-size: 12px;
+    text-align: left;
+    display: block;
+    border-radius: var(--border-radius-small);
+    transition: background-color var(--transition-fast);
+}
+
+.power-menu-item:hover {
+    background-color: var(--color-green-light);
+    color: var(--color-green);
+}

@@ -8,7 +8,7 @@ const JsonValue = @import("jsonpico").JsonValue;
 
 /// A node in a doubly linked list that stores a message string.
 const MessageNode = struct {
-    message: []const u8,
+    message: [*:0]const u8,
     prev: ?*MessageNode,
     next: ?*MessageNode,
 
@@ -20,8 +20,10 @@ const MessageNode = struct {
     /// Returns an error if allocation fails.
     pub fn create(allocator: std.mem.Allocator, message: []const u8) !*Self {
         const node = try allocator.create(Self);
+        const c_message = try allocator.dupeZ(u8, message);
         node.* = Self {
-            .message = try allocator.dupe(u8, message),
+            // .message = try allocator.dupe(u8, message),
+            .message = c_message.ptr,
             .prev = null,
             .next = null,
         };
@@ -30,7 +32,8 @@ const MessageNode = struct {
 
     /// Frees the memory used by this node, including its message.
     pub fn destroy(self: *Self, allocator: std.mem.Allocator) void {
-        allocator.free(self.message);
+        // allocator.free(self.message);
+        allocator.free(std.mem.span(self.message));
         allocator.destroy(self);
     }
 };
@@ -74,7 +77,7 @@ const MessageManager = struct {
     
     /// Create a new MessageNode to the end of the list
     /// If the list exceeds `max_count`, the oldest message is automatically removed.
-    /// The message string is duplicated internally.
+ /// The message string is duplicated internally.
     pub fn append(self: *Self, message: []const u8) !void {
         if (self.count >= self.max_count) {
             self.removeOldest();
@@ -158,7 +161,7 @@ pub const Notification = extern struct {
         current_node: ?*MessageNode,
         // Currently displayed message.
         //
-        current_message: ?[*:0]u8, // Currently displayed message
+        current_message: ?[*:0]const u8, // Currently displayed message
         
         main_hbox: *gtk.Box,
         icon_button: *gtk.Button,
@@ -175,6 +178,7 @@ pub const Notification = extern struct {
         icon_width: c_int,
         text_width: c_int, // Width of the message label for display
         allocator: ?std.mem.Allocator,
+        popover: ?*gtk.Popover,
         var offset: c_int = 0;
     };
     
@@ -210,14 +214,19 @@ pub const Notification = extern struct {
                 }
             }
             manager.current = manager.head;
+            priv.current_node = manager.current;
 
-            // Set the message to be displayed.
-            if (manager.current) |cur_node| {
-                try setDisplayedMessage(notification, allocator, cur_node.message);
+            if (priv.current_node) |cn| {
+                priv.current_message = cn.message;
             } else {
-                const template = "No message";
-                try setDisplayedMessage(notification, allocator, template);
+                try manager.append("No message");
+                manager.current = manager.head;
+                if (manager.current) |cn| {
+                    priv.current_message = cn.message;
+                    priv.current_node = cn;
+                }
             }
+
             if (priv.current_message) |t| {
                 gtk.Label.setText(priv.label, t);
             }
@@ -233,6 +242,8 @@ pub const Notification = extern struct {
         priv.scroll_position = @as(f64, @floatFromInt(available_width));
 
         notification.initializeWithAllocator();
+        notification.createPopover();
+
         return notification;
     }
 
@@ -283,6 +294,7 @@ pub const Notification = extern struct {
         priv.icon_width = 24;
         priv.text_width = 0;
         priv.allocator = null;
+        priv.popover = null;
 
         priv.main_hbox = gtk.Box.new(gtk.Orientation.horizontal, 8);
         priv.icon_button = gtk.Button.new();
@@ -325,53 +337,133 @@ pub const Notification = extern struct {
 
         gtk.Box.append(priv.main_hbox, priv.scrolled_window.as(gtk.Widget));
         gtk.Box.append(notification.as(gtk.Box), priv.main_hbox.as(gtk.Widget));
+
         
         gtk.Widget.show(notification.as(gtk.Widget));
+    }
+
+    fn createPopover(notification: *Notification) void {
+        const priv = notification.private();
+        const popover = gtk.Popover.new();
+
+        gtk.Widget.setParent(popover.as(gtk.Widget), priv.icon_button.as(gtk.Widget));
+        gtk.Popover.setPosition(popover, gtk.PositionType.bottom);
+
+        gtk.Popover.setHasArrow(popover, 0);
+
+        gtk.Widget.setHalign(popover.as(gtk.Widget), gtk.Align.start);
+
+        gtk.Widget.setMarginTop(popover.as(gtk.Widget), 0);
+        gtk.Widget.setMarginBottom(popover.as(gtk.Widget), 0);
+        gtk.Widget.setMarginStart(popover.as(gtk.Widget), 0);
+        gtk.Widget.setMarginEnd(popover.as(gtk.Widget), 0);
+
+        notification.private().popover = popover;
+        const popover_style_context = gtk.Widget.getStyleContext(popover.as(gtk.Widget));
+        gtk.StyleContext.addClass(popover_style_context, "notification-menu");
+
+        // Create vertical box for menu items
+        const box = gtk.Box.new(gtk.Orientation.vertical, 0);
+        gtk.Widget.setSizeRequest(box.as(gtk.Widget), 250, -1);
+        gtk.Widget.setMarginTop(box.as(gtk.Widget), 0);
+        gtk.Widget.setMarginBottom(box.as(gtk.Widget), 0);
+        gtk.Widget.setMarginStart(box.as(gtk.Widget), 0);
+        gtk.Widget.setMarginEnd(box.as(gtk.Widget), 0);
+        gtk.Popover.setChild(popover, box.as(gtk.Widget));
+
+        const box_style_context = gtk.Widget.getStyleContext(box.as(gtk.Widget));
+        gtk.StyleContext.addClass(box_style_context, "notification-menu-box");
+
+        notification.createPopoverTab(box);
+
+        // Create menu items
+        if (priv.manager) |manager| {
+            var node = manager.head;
+            while (true) {
+                if (node) |n| {
+                    notification.createMenuItem(box, n.message);
+                    node = n.next;
+                } else {
+                    break;
+                }
+            }
+        }
+    }
+
+    fn createPopoverTab(notification: *Notification, box: *gtk.Box) void {
+        _ = notification;
+        const container = gtk.Box.new(gtk.Orientation.horizontal, 0);
+        gtk.Widget.setMarginStart(container.as(gtk.Widget), 1);
+        gtk.Widget.setMarginEnd(container.as(gtk.Widget), 1);
+
+        const button = gtk.Button.newWithLabel("Message");
+        const msg_button_style_context = gtk.Widget.getStyleContext(button.as(gtk.Widget));
+        gtk.StyleContext.addClass(msg_button_style_context, "msg-tab");
+        gtk.StyleContext.removeClass(msg_button_style_context, "button");
+
+        gtk.Widget.setHalign(button.as(gtk.Widget), gtk.Align.fill);
+        gtk.Widget.setHexpand(button.as(gtk.Widget), 1);
+        gtk.Widget.setVexpand(button.as(gtk.Widget), 0);
+
+        gtk.Box.append(container, button.as(gtk.Widget));
+
+        // Notification tab
+        const notification_button = gtk.Button.newWithLabel("Message");
+        const notification_button_style_context = gtk.Widget.getStyleContext(notification_button.as(gtk.Widget));
+        gtk.StyleContext.addClass(notification_button_style_context, "msg-tab");
+        gtk.StyleContext.removeClass(notification_button_style_context, "button");
+
+        gtk.Widget.setHalign(notification_button.as(gtk.Widget), gtk.Align.fill);
+        gtk.Widget.setHexpand(notification_button.as(gtk.Widget), 1);
+        gtk.Widget.setVexpand(notification_button.as(gtk.Widget), 0);
+
+        gtk.Box.append(container, notification_button.as(gtk.Widget));
+
+        gtk.Box.append(box, container.as(gtk.Widget));
+        
+    }
+
+    fn createMenuItem(notification: *Notification, box: *gtk.Box, label: [*:0]const u8) void {
+        _ = notification;
+        const container = gtk.Box.new(gtk.Orientation.horizontal, 0);
+        gtk.Widget.setMarginStart(container.as(gtk.Widget), 1);
+        gtk.Widget.setMarginEnd(container.as(gtk.Widget), 1);
+
+        const button = gtk.Button.newWithLabel(label);
+        
+        // Set button styling
+        const style_context = gtk.Widget.getStyleContext(button.as(gtk.Widget));
+        gtk.StyleContext.addClass(style_context, "power-menu-item");
+        gtk.StyleContext.removeClass(style_context, "button");
+        
+        // Set button properties
+        gtk.Widget.setHalign(button.as(gtk.Widget), gtk.Align.fill);
+        gtk.Widget.setHexpand(button.as(gtk.Widget), 1);
+        gtk.Widget.setVexpand(button.as(gtk.Widget), 0);
+
+        gtk.Box.append(container, button.as(gtk.Widget));
+
+        const button_child = gtk.Button.getChild(button);
+        if (button_child) |child| {
+            gtk.Widget.setHalign(child, gtk.Align.center);
+        }
+        
+        gtk.Box.append(box, container.as(gtk.Widget));
     }
 
     /// Control audio playback state
     fn onIconButtonClicked(button: *gtk.Button, notification: *Notification) callconv(.c) void {
         _ = button;
-        _ = notification;
 
-        // const priv = music.private();
-        //
-        // const allocator = priv.allocator orelse {
-        //     std.debug.print("Allocator not available for button click\n", .{});
-        //     return;
-        // };
-        //
-        // // Retrieve currently playing media metadata using playctl
-        // const status_result = std.process.Child.run(.{
-        //     .allocator = allocator,
-        //     .argv = &[_][]const u8{ "playerctl", "status" },
-        // }) catch |err| {
-        //     std.debug.print("Failed to get player status: {}\n", .{err});
-        //     return;
-        // };
-        // defer allocator.free(status_result.stdout);
-        // defer allocator.free(status_result.stderr);
-        //
-        // if (status_result.term.Exited == 0) {
-        //     const status = std.mem.trim(u8, status_result.stdout, "\n\r ");
-        //
-        //     const toggle_result = std.process.Child.run(.{
-        //         .allocator = allocator,
-        //         .argv = &[_][]const u8{ "playerctl", "play-pause" },
-        //     }) catch |err| {
-        //         std.debug.print("Failed to toggle playback: {}\n", .{err});
-        //         return;
-        //     };
-        //     defer allocator.free(toggle_result.stdout);
-        //     defer allocator.free(toggle_result.stderr);
-        //
-        //     const was_playing = std.mem.eql(u8, status, "Playing");
-        //     music.updateIconForPlayingState(!was_playing);
-        //
-        //     std.debug.print("Toggled playback. Was playing: {}, Now playing: {}\n", .{ was_playing, !was_playing });
-        // } else {
-        //     std.debug.print("No active player found\n", .{});
-        // }
+        const priv = notification.private();
+
+        if (priv.popover) |popover| {
+            if (gtk.Widget.getVisible(popover.as(gtk.Widget)) != 0) {
+                gtk.Popover.popdown(popover);
+            } else {
+                gtk.Popover.popup(popover);
+            }
+        }
     }
     
     /// Update matadata of playing
@@ -492,19 +584,13 @@ pub const Notification = extern struct {
                     priv.scroll_position = @as(f64, @floatFromInt(available_width));
                     if (priv.manager) |manager| {
                         if (manager.next()) |next_node| {
-                            const allocator = priv.allocator orelse return 0;
-                            const temp_cstr = allocator.dupeZ(u8, next_node.message) catch return 0;
-
-                            gtk.Label.setText(priv.label, temp_cstr.ptr);
+                            gtk.Label.setText(priv.label, next_node.message);
 
                             gtk.Widget.setMarginStart(priv.label.as(gtk.Widget), 0);
                             gtk.Widget.setMarginEnd(priv.label.as(gtk.Widget), 0);
                             gtk.Adjustment.setValue(gtk.ScrolledWindow.getHadjustment(priv.scrolled_window), 0.0);
 
-                            if (priv.current_message) |old_msg| {
-                                allocator.free(std.mem.span(old_msg));
-                            }
-                            priv.current_message = temp_cstr.ptr;
+                            priv.current_message = next_node.message;
                             
                             var req: gtk.Requisition = undefined;
                             gtk.Widget.getPreferredSize(priv.label.as(gtk.Widget), null, &req);
@@ -542,12 +628,17 @@ pub const Notification = extern struct {
             gtk.Widget.removeTickCallback(music.as(gtk.Widget), priv.scroll_tick_id);
             priv.scroll_tick_id = 0;
         }
-        
-        if (priv.current_message) |ta| {
-            if (priv.allocator) |allocator| {
-                allocator.free(std.mem.span(ta));
-            }
+
+        if (priv.manager) |manager| {
+            manager.deinit();
+            priv.manager = null;
         }
+        
+        // if (priv.current_message) |ta| {
+        //     if (priv.allocator) |allocator| {
+        //         allocator.free(std.mem.span(ta));
+        //     }
+        // }
         
         gobject.Object.virtual_methods.dispose.call(Class.parent, music.as(Parent));
     }
