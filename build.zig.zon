@@ -11,6 +11,10 @@
             .url = "git+https://github.com/okonomipizza/jsonpico#8798d0f20b6baf4f7d16f9eea471828c6af4d2c6",
             .hash = "jsonpico-0.1.0-49TRqrCoAACh6jtHpJubfw-w46BmHxhpfg9jN1QQrnD_",
         },
+        .zig_jsonc = .{
+            .url = "git+https://github.com/okonomipizza/zig_jsonc#16e2afcc3451ef8d503077ed502110f8b887222d",
+            .hash = "zig_jsonc-0.0.0-XoucTOBtAAB9d-UOhrL5Qty2YBknEqdywtiqcfRDMBcX",
+        },
     },
     .paths = .{
         "build.zig",

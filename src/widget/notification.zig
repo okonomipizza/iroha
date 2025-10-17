@@ -4,7 +4,6 @@ const gobject = @import("gobject");
 const gtk = @import("gtk");
 const gdk = @import("gdk");
 const pango = @import("pango");
-const JsonValue = @import("jsonpico").JsonValue;
 
 /// A node in a doubly linked list that stores a message string.
 const MessageNode = struct {
@@ -193,7 +192,7 @@ pub const Notification = extern struct {
     });
     
     /// Returns initialized instance
-    pub fn new(allocator: std.mem.Allocator, config: ?*JsonValue) !*Notification {
+    pub fn new(allocator: std.mem.Allocator, config: ?*std.json.Value) !*Notification {
         var notification = gobject.ext.newInstance(Notification, .{});
         const notification_style_context = gtk.Widget.getStyleContext(notification.as(gtk.Widget));
         gtk.StyleContext.addClass(notification_style_context, "notification");
@@ -204,10 +203,10 @@ pub const Notification = extern struct {
         if (priv.manager) |manager| {
             if (config) |cfg| {
                 if (cfg.* == .object) {
-                    if (cfg.object.value.get("messages")) |messages| {
+                    if (cfg.object.get("messages")) |messages| {
                         if (messages == .array) {
-                             for (messages.array.value.items) |item| {
-                                try manager.append(item.string.value.items);
+                             for (messages.array.items) |item| {
+                                try manager.append(item.string);
                             }
                         }
                     }

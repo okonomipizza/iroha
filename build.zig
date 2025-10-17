@@ -9,7 +9,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    const jsonpico = b.dependency("jsonpico", .{});
+    const zig_jsonc = b.dependency("zig_jsonc", .{});
 
     const mod = b.createModule(.{
         .root_source_file = b.path("src/main.zig"),
@@ -67,7 +67,7 @@ pub fn build(b: *std.Build) void {
         // }),
     });
 
-    exe.root_module.addImport("jsonpico", jsonpico.module("jsonpico"));
+    exe.root_module.addImport("zig_jsonc", zig_jsonc.module("zig_jsonc"));
 
     const layer_shell_flags = b.run(&.{ "pkg-config", "--cflags", "--libs", "gtk4-layer-shell-0" });
     var layer_shell_flag_iter = std.mem.splitAny(u8, std.mem.trim(u8, layer_shell_flags, " \n\r\t"), " ");

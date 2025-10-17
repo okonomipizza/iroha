@@ -9,13 +9,13 @@ const Clock = @import("./widget/clock.zig").Clock;
 const Powermenu = @import("./widget/power.zig").PowerMenu;
 const Music = @import("./widget/music.zig").Music;
 const Notification = @import("./widget/notification.zig").Notification;
-const jsonpico = @import("jsonpico");
+const jsonc = @import("zig_jsonc");
 const config = @import("config.zig");
 
 
 fn activate(app: *gtk.Application, user_data: ?*anyopaque) callconv(.c) void {
     if (user_data) |data| {
-        const messages = @as(*jsonpico.JsonValue, @ptrCast(@alignCast(data))); 
+        const messages = @as(*std.json.Value, @ptrCast(@alignCast(data))); 
         var window = gtk.ApplicationWindow.new(app);
         gtk.Window.setTitle(window.as(gtk.Window), "System Bar");
         gtk.Window.setDefaultSize(window.as(gtk.Window), 200, 10);
@@ -118,16 +118,15 @@ pub fn main() !void {
     var reader = file.reader(msgs_buffer);
     const messages = try reader.interface.readAlloc(allocator, file_size);
 
-    var jsonc_parser = try jsonpico.JsonParser.init(allocator, messages);
-    defer jsonc_parser.deinit(allocator);
+    var jsonc_parser = try jsonc.JsoncParser.init(allocator, messages);
+    defer jsonc_parser.deinit();
 
-    const message_json = try jsonc_parser.parse(allocator);
+    const message_json = try jsonc_parser.parse();
     if (message_json == .object) {
-        const message_root = message_json.object.value;
-        const msgs = message_root.get("messages");
+        const msgs = message_json.object.get("messages");
         if (msgs) |m| {
             if (m == .array) {
-                std.debug.print("num of messages {d}\n", .{m.array.value.items.len});
+                std.debug.print("num of messages {d}\n", .{m.array.items.len});
             }
         }
 
@@ -137,7 +136,7 @@ pub fn main() !void {
 
     var app = gtk.Application.new("org.iroha.systembar", .{});
     defer app.unref();
-        const message_ptr = try allocator.create(jsonpico.JsonValue);
+        const message_ptr = try allocator.create(std.json.Value);
         message_ptr.* = message_json;
 
         _ = gio.Application.signals.activate.connect(app, ?*anyopaque, &activate, @ptrCast(message_ptr), .{});
