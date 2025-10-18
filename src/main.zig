@@ -98,10 +98,6 @@ pub fn main() !void {
     const config_ptr = try allocator.create(Config);
     config_ptr.* = config;
     
-    // const message_ptr = try allocator.create(std.json.Value);
-    // message_ptr.* = message_json;
-
-    // _ = gio.Application.signals.activate.connect(app, ?*anyopaque, &activate, @ptrCast(message_ptr), .{});
     _ = gio.Application.signals.activate.connect(app, ?*anyopaque, &activate, @ptrCast(config_ptr), .{});
     const status = gio.Application.run(app.as(gio.Application), @intCast(std.os.argv.len), std.os.argv.ptr);
 
