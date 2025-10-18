@@ -78,6 +78,7 @@ pub const Music = extern struct {
             std.debug.print("Warning: allocator not set\n", .{});
             return;
         }
+        music.updatePlaybackStatus();
         updateMetadata(music);
         startAnimation(music);
     }
@@ -399,6 +400,31 @@ pub const Music = extern struct {
             return 1;
         }
         return 0;
+    }
+
+    fn updatePlaybackStatus(music: *Music) void {
+        const priv = music.private();
+
+        const allocator = priv.allocator orelse {
+            std.debug.print("Allocator not available for status check\n", .{});
+            return;
+        };
+
+        const status_result = std.process.Child.run(.{
+            .allocator = allocator,
+            .argv = &[_][]const u8{ "playerctl", "status" },
+        }) catch |err| {
+            std.debug.print("Failed to get player status: {}\n", .{err});
+            return;
+        };
+        defer allocator.free(status_result.stdout);
+        defer allocator.free(status_result.stderr);
+
+        if (status_result.term.Exited == 0 and status_result.stdout.len > 0) {
+            const status = std.mem.trim(u8, status_result.stdout, "\n\r ");
+            const is_playing = std.mem.eql(u8, status, "Playing");
+            music.updateIconForPlayingState(is_playing);
+        }
     }
 
     fn dispose(music: *Music) callconv(.c) void {
