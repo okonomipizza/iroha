@@ -78,23 +78,20 @@ pub const Clock = extern struct {
 
     fn getFormattedTime(clock: *Clock, buffer: []u8) [*:0]const u8 {
         const timestamp = std.time.timestamp();
-        const epoch_seconds = @as(u64, @intCast(timestamp));
-        const local_seconds = epoch_seconds + @as(u64, @intCast(clock.private().timezone_offset_hours * 3600));
+        const jst_offset = 9 * 3600;
+        const epoch_seconds = @as(u64, @intCast(timestamp + jst_offset));
+        const epoch = std.time.epoch.EpochSeconds{ .secs = epoch_seconds };
+        const epoch_day = epoch.getEpochDay();
+        const year_day = epoch_day.calculateYearDay();
+        const month_day = year_day.calculateMonthDay();
+        const day_seconds = epoch.getDaySeconds();
 
-        // Calculate date components
-        const days_since_epoch = local_seconds / 86400;
-        const seconds_today = local_seconds % 86400;
-
-        // Calculate time components
-        const hours = seconds_today / 3600;
-        const minutes = (seconds_today % 3600) / 60;
-        const seconds = seconds_today % 60;
-
-        // Calculate date (simple approximation)
-        const year = 1970 + days_since_epoch / 365;
-        const day_of_year = days_since_epoch % 365;
-        const month = (day_of_year / 30) + 1;
-        const day = (day_of_year % 30) + 1;
+        const year: u16 = @intCast(year_day.year);
+        const month: u8 = @intCast(month_day.month.numeric());
+        const day: u8 = @intCast(month_day.day_index + 1);
+        const hours: u8 = @intCast(day_seconds.getHoursIntoDay());
+        const minutes: u8 = @intCast(day_seconds.getMinutesIntoHour());
+        const seconds: u8 = @intCast(day_seconds.getSecondsIntoMinute());
 
         const formatted = switch (clock.private().mode) {
             .time_only => std.fmt.bufPrintZ(buffer, "{:0>2}:{:0>2}:{:0>2}", .{ hours, minutes, seconds }),
@@ -150,3 +147,23 @@ pub const Clock = extern struct {
 
     const Self = @This();
 };
+
+        // const timestamp = std.time.timestamp();
+        // const epoch_seconds = @as(u64, @intCast(timestamp));
+        // const local_seconds = epoch_seconds + @as(u64, @intCast(clock.private().timezone_offset_hours * 3600));
+        //
+        // // Calculate date components
+        // const days_since_epoch = local_seconds / 86400;
+        // const seconds_today = local_seconds % 86400;
+        //
+        // // Calculate time components
+        // const hours = seconds_today / 3600;
+        // const minutes = (seconds_today % 3600) / 60;
+        // const seconds = seconds_today % 60;
+        //
+        // // Calculate date (simple approximation)
+        // const year = 1970 + days_since_epoch / 365;
+        // const day_of_year = days_since_epoch % 365;
+        // const month = (day_of_year / 30) + 1;
+        // const day = (day_of_year % 30) + 1;
+        //
