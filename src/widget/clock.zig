@@ -147,23 +147,3 @@ pub const Clock = extern struct {
 
     const Self = @This();
 };
-
-        // const timestamp = std.time.timestamp();
-        // const epoch_seconds = @as(u64, @intCast(timestamp));
-        // const local_seconds = epoch_seconds + @as(u64, @intCast(clock.private().timezone_offset_hours * 3600));
-        //
-        // // Calculate date components
-        // const days_since_epoch = local_seconds / 86400;
-        // const seconds_today = local_seconds % 86400;
-        //
-        // // Calculate time components
-        // const hours = seconds_today / 3600;
-        // const minutes = (seconds_today % 3600) / 60;
-        // const seconds = seconds_today % 60;
-        //
-        // // Calculate date (simple approximation)
-        // const year = 1970 + days_since_epoch / 365;
-        // const day_of_year = days_since_epoch % 365;
-        // const month = (day_of_year / 30) + 1;
-        // const day = (day_of_year % 30) + 1;
-        //
