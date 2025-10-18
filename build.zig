@@ -85,9 +85,6 @@ pub fn build(b: *std.Build) void {
 
     b.installArtifact(exe);
 
-    const copy_assets = b.addInstallFile(b.path("src/play.svg"), "bin/play.svg");
-    b.getInstallStep().dependOn(&copy_assets.step);
-
     const exe_run = b.addRunArtifact(exe);
     exe_run.step.dependOn(b.getInstallStep());
     //
