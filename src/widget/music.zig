@@ -9,12 +9,12 @@ const pango = @import("pango");
 pub const Music = extern struct {
     parent_instance: Parent,
     pub const Parent = gtk.Box;
-    
+
     const Private = struct {
         title_artist: ?[*:0]u8, // Concatanate string of the currently playing track
         title: ?[*:0]u8, // Title of the currently playing track
         is_playing: bool, // Playback status indicating whether media is currently playing
-        
+
         main_hbox: *gtk.Box,
         icon_button: *gtk.Button,
         icon: *gtk.Image,
@@ -32,9 +32,9 @@ pub const Music = extern struct {
         allocator: ?std.mem.Allocator,
         var offset: c_int = 0;
     };
-    
+
     const Self = @This();
-    
+
     pub const getGObjectType = gobject.ext.defineClass(Self, .{
         .name = "IrohaMusic",
         .instanceInit = &init,
@@ -42,7 +42,7 @@ pub const Music = extern struct {
         .parent_class = &Class.parent,
         .private = .{ .Type = Private, .offset = &Private.offset },
     });
-    
+
     /// Returns initialized instance
     pub fn new(allocator: std.mem.Allocator) *Music {
         var music = gobject.ext.newInstance(Music, .{});
@@ -81,11 +81,10 @@ pub const Music = extern struct {
         updateMetadata(music);
         startAnimation(music);
     }
-    
-    
+
     fn init(music: *Music, _: *Class) callconv(.c) void {
         var priv = music.private();
-        
+
         priv.title = null;
         priv.is_playing = false;
         priv.scroll_position = 0.0;
@@ -118,8 +117,8 @@ pub const Music = extern struct {
 
         priv.scrolled_window = gtk.ScrolledWindow.new();
         gtk.ScrolledWindow.setPolicy(
-            priv.scrolled_window, 
-            gtk.PolicyType.automatic, 
+            priv.scrolled_window,
+            gtk.PolicyType.automatic,
             gtk.PolicyType.never,
         );
         // Hide horizontal scroll bar
@@ -129,7 +128,7 @@ pub const Music = extern struct {
 
         priv.label_hbox = gtk.Box.new(gtk.Orientation.horizontal, 10);
         gtk.ScrolledWindow.setChild(priv.scrolled_window, priv.label_hbox.as(gtk.Widget));
-        
+
         priv.label = gtk.Label.new("No music playing");
         gtk.Widget.setSizeRequest(priv.label.as(gtk.Widget), -1, 20);
         gtk.Label.setEllipsize(priv.label, pango.EllipsizeMode.none);
@@ -138,7 +137,7 @@ pub const Music = extern struct {
 
         gtk.Box.append(priv.main_hbox, priv.scrolled_window.as(gtk.Widget));
         gtk.Box.append(music.as(gtk.Box), priv.main_hbox.as(gtk.Widget));
-        
+
         gtk.Widget.show(music.as(gtk.Widget));
     }
 
@@ -146,7 +145,7 @@ pub const Music = extern struct {
     fn onIconButtonClicked(button: *gtk.Button, music: *Music) callconv(.c) void {
         _ = button;
         const priv = music.private();
-        
+
         const allocator = priv.allocator orelse {
             std.debug.print("Allocator not available for button click\n", .{});
             return;
@@ -165,7 +164,7 @@ pub const Music = extern struct {
 
         if (status_result.term.Exited == 0) {
             const status = std.mem.trim(u8, status_result.stdout, "\n\r ");
-            
+
             const toggle_result = std.process.Child.run(.{
                 .allocator = allocator,
                 .argv = &[_][]const u8{ "playerctl", "play-pause" },
@@ -178,7 +177,7 @@ pub const Music = extern struct {
 
             const was_playing = std.mem.eql(u8, status, "Playing");
             music.updateIconForPlayingState(!was_playing);
-            
+
             std.debug.print("Toggled playback. Was playing: {}, Now playing: {}\n", .{ was_playing, !was_playing });
         } else {
             std.debug.print("No active player found\n", .{});
@@ -187,7 +186,7 @@ pub const Music = extern struct {
 
     fn updateMetadataTitle(music: *Music) bool {
         var priv = music.private();
-        
+
         const allocator = priv.allocator orelse {
             std.debug.print("Warning: allocator not available for updateTitle\n", .{});
             return false;
@@ -195,7 +194,7 @@ pub const Music = extern struct {
 
         const title_result = std.process.Child.run(.{
             .allocator = allocator,
-            .argv = &[_][]const u8{ "playerctl", "metadata", "title"},
+            .argv = &[_][]const u8{ "playerctl", "metadata", "title" },
         }) catch |err| {
             std.debug.print("Command execution failed: {}\n", .{err});
             return false;
@@ -220,12 +219,12 @@ pub const Music = extern struct {
                     return true;
                 }
             } else {
-                    const c_title = allocator.dupeZ(u8, title) catch {
-                        std.debug.print("Memory allocation failed\n", .{});
-                        return false;
-                    };
-                    priv.title = c_title.ptr;
-                    return true;
+                const c_title = allocator.dupeZ(u8, title) catch {
+                    std.debug.print("Memory allocation failed\n", .{});
+                    return false;
+                };
+                priv.title = c_title.ptr;
+                return true;
             }
         } else {
             if (priv.title) |old_title| {
@@ -236,20 +235,20 @@ pub const Music = extern struct {
         }
         return false;
     }
-    
+
     /// Update matadata of playing
     fn updateMetadata(music: *Music) void {
         var priv = music.private();
-        
+
         const allocator = priv.allocator orelse {
             std.debug.print("Warning: allocator not available for updateTitle\n", .{});
             return;
         };
-        
+
         // Get title using playerctl
         const title_result = std.process.Child.run(.{
             .allocator = allocator,
-            .argv = &[_][]const u8{ "playerctl", "metadata", "title"},
+            .argv = &[_][]const u8{ "playerctl", "metadata", "title" },
         }) catch |err| {
             std.debug.print("Command execution failed: {}\n", .{err});
             return;
@@ -260,14 +259,14 @@ pub const Music = extern struct {
         // Get artist using playerctl
         const artist_result = std.process.Child.run(.{
             .allocator = allocator,
-            .argv = &[_][]const u8{ "playerctl", "metadata", "artist"},
+            .argv = &[_][]const u8{ "playerctl", "metadata", "artist" },
         }) catch |err| {
             std.debug.print("Command execution failed: {}\n", .{err});
             return;
         };
         defer allocator.free(artist_result.stdout);
         defer allocator.free(artist_result.stderr);
-        
+
         if (title_result.term.Exited == 0 and title_result.stdout.len > 0) {
             const title = std.mem.trim(u8, title_result.stdout, "\n\r ");
             const artist = blk: {
@@ -289,27 +288,27 @@ pub const Music = extern struct {
                     return;
                 };
             defer allocator.free(display_text);
-            
+
             if (priv.title_artist) |old| {
                 allocator.free(std.mem.span(old));
             }
-            
+
             const c_title = allocator.dupeZ(u8, display_text) catch {
                 std.debug.print("Memory allocation failed\n", .{});
                 return;
             };
-            
+
             priv.title_artist = c_title.ptr;
-            
+
             if (priv.title_artist) |t| {
                 gtk.Label.setText(priv.label, t);
             }
-            
+
             // Get text width
             var req: gtk.Requisition = undefined;
             gtk.Widget.getPreferredSize(priv.label.as(gtk.Widget), null, &req);
             priv.text_width = req.f_width;
-            
+
             // Reset scroll position
             priv.scroll_position = 0.0;
         } else {
@@ -317,7 +316,7 @@ pub const Music = extern struct {
             priv.text_width = 150;
         }
     }
-    
+
     fn startAnimation(music: *Music) void {
         var priv = music.private();
         // Stop existing tick callbacks
@@ -329,21 +328,11 @@ pub const Music = extern struct {
             gtk.Widget.removeTickCallback(music.as(gtk.Widget), priv.update_tick_id);
             priv.update_tick_id = 0;
         }
-         
-        priv.scroll_tick_id = gtk.Widget.addTickCallback(
-            music.as(gtk.Widget),
-            &animateScrollTick,
-            music,
-            null
-        );
-        priv.update_tick_id = gtk.Widget.addTickCallback(
-            music.as(gtk.Widget),
-            &updateTitleTick,
-            music,
-            null
-        );
+
+        priv.scroll_tick_id = gtk.Widget.addTickCallback(music.as(gtk.Widget), &animateScrollTick, music, null);
+        priv.update_tick_id = gtk.Widget.addTickCallback(music.as(gtk.Widget), &updateTitleTick, music, null);
     }
-    
+
     fn animateScrollTick(widget: *gtk.Widget, frame_clock: *gdk.FrameClock, user_data: ?*anyopaque) callconv(.c) c_int {
         _ = widget;
         _ = frame_clock;
@@ -353,29 +342,29 @@ pub const Music = extern struct {
             var priv = music.private();
 
             const available_width = priv.widget_width - 8;
-            
+
             // Only scroll if text is longer than widget width
             if (priv.text_width > available_width) {
                 // Update scroll position
                 priv.scroll_position += 0.2;
-                
+
                 // Reset when reaching maximum scroll position
                 const max_scroll = @as(f64, @floatFromInt(priv.text_width - available_width + 100));
                 if (priv.scroll_position > max_scroll) {
                     priv.scroll_position = -100.0;
                 }
-                
+
                 // Apply scroll position
                 const adjustment = gtk.ScrolledWindow.getHadjustment(priv.scrolled_window);
                 if (priv.scroll_position >= 0) {
                     gtk.Adjustment.setValue(adjustment, priv.scroll_position);
                 }
             }
-            
+
             // Continue timer
             return 1;
         }
-        
+
         return 0;
     }
 
@@ -388,11 +377,11 @@ pub const Music = extern struct {
             const priv = music.private();
 
             priv.frame_count += 1;
-            
+
             // Now supports 60 fps 3 seconds
             if (priv.frame_count >= 120) {
                 priv.frame_count = 0;
-                
+
                 if (updateMetadataTitle(music)) {
                     updateMetadata(music);
                     return 1;
@@ -411,10 +400,10 @@ pub const Music = extern struct {
         }
         return 0;
     }
-    
+
     fn dispose(music: *Music) callconv(.c) void {
         var priv = music.private();
-        
+
         if (priv.scroll_tick_id != 0) {
             gtk.Widget.removeTickCallback(music.as(gtk.Widget), priv.scroll_tick_id);
             priv.scroll_tick_id = 0;
@@ -423,7 +412,7 @@ pub const Music = extern struct {
             gtk.Widget.removeTickCallback(music.as(gtk.Widget), priv.update_tick_id);
             priv.update_tick_id = 0;
         }
-        
+
         // メモリを解放
         if (priv.title_artist) |ta| {
             if (priv.allocator) |allocator| {
@@ -435,15 +424,15 @@ pub const Music = extern struct {
                 allocator.free(std.mem.span(title));
             }
         }
-        
+
         // 親クラスのdisposeを呼び出し
         gobject.Object.virtual_methods.dispose.call(Class.parent, music.as(Parent));
     }
-    
+
     fn private(music: *Music) *Private {
         return gobject.ext.impl_helpers.getPrivate(music, Private, Private.offset);
     }
-    
+
     pub fn as(music: *Music, comptime T: type) *T {
         return gobject.ext.as(T, music);
     }
@@ -451,13 +440,13 @@ pub const Music = extern struct {
     pub const Class = extern struct {
         parent_class: Parent.Class,
         var parent: *Parent.Class = undefined;
-        
+
         pub const Instance = Music;
-        
+
         pub fn as(class: *Class, comptime T: type) *T {
             return gobject.ext.as(T, class);
         }
-        
+
         fn init(class: *Class) callconv(.c) void {
             gobject.Object.virtual_methods.dispose.implement(class, &dispose);
         }

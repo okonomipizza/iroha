@@ -12,8 +12,8 @@
             .hash = "jsonpico-0.1.0-49TRqrCoAACh6jtHpJubfw-w46BmHxhpfg9jN1QQrnD_",
         },
         .zig_jsonc = .{
-            .url = "git+https://github.com/okonomipizza/zig_jsonc#16e2afcc3451ef8d503077ed502110f8b887222d",
-            .hash = "zig_jsonc-0.0.0-XoucTOBtAAB9d-UOhrL5Qty2YBknEqdywtiqcfRDMBcX",
+            .url = "git+https://github.com/okonomipizza/zig_jsonc#e0ebeef0035ecc661efbdbb9c7223fdc3b9df9d0",
+            .hash = "zig_jsonc-0.0.0-XoucTCpzAADOqlT4yr80VnOVM_73_zBWNxSwklbD40jt",
         },
     },
     .paths = .{

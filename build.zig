@@ -23,6 +23,7 @@ pub fn build(b: *std.Build) void {
             .{ .name = "pango", .module = gobject.module("pango1") },
             .{ .name = "pangocairo", .module = gobject.module("pangocairo1") },
             .{ .name = "gdk", .module = gobject.module("gdk4") },
+            .{ .name = "gdkpixbuf", .module = gobject.module("gdkpixbuf2") },
             .{ .name = "gtk", .module = gobject.module("gtk4") },
         },
     });

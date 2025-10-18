@@ -6,21 +6,24 @@ const gtk = @import("gtk");
 const layer_shell = @import("layer_shell.zig");
 const gdk = @import("gdk");
 const Clock = @import("./widget/clock.zig").Clock;
-const Powermenu = @import("./widget/power.zig").PowerMenu;
+const SystemMenu = @import("./widget/system.zig").SystemMenu;
 const Music = @import("./widget/music.zig").Music;
 const Notification = @import("./widget/notification.zig").Notification;
 const jsonc = @import("zig_jsonc");
-const config = @import("config.zig");
-
+const app_config = @import("config.zig");
+const Config = app_config.Config;
+const loadCss = @import("css.zig").loadCss;
 
 fn activate(app: *gtk.Application, user_data: ?*anyopaque) callconv(.c) void {
     if (user_data) |data| {
-        const messages = @as(*std.json.Value, @ptrCast(@alignCast(data))); 
+        const allocator = std.heap.page_allocator;
+
+        const config = @as(*Config, @ptrCast(@alignCast(data)));
         var window = gtk.ApplicationWindow.new(app);
         gtk.Window.setTitle(window.as(gtk.Window), "System Bar");
         gtk.Window.setDefaultSize(window.as(gtk.Window), 200, 10);
 
-        loadCss() catch {
+        loadCss(allocator, config) catch {
             std.posix.exit(1);
         };
 
@@ -50,16 +53,21 @@ fn activate(app: *gtk.Application, user_data: ?*anyopaque) callconv(.c) void {
 
         // Create clock widget (JST)
         var clock = Clock.new(9);
-        var menu = Powermenu.new();
+        var menu = SystemMenu.new();
 
-        const allocator = std.heap.page_allocator;
         var music = Music.new(allocator);
 
         const clock_style_context = gtk.Widget.getStyleContext(clock.as(gtk.Widget));
         gtk.StyleContext.addClass(clock_style_context, "clock");
         gtk.StyleContext.addClass(clock_style_context, "clock-button");
 
-        var norification = Notification.new(allocator, messages) catch {
+        const messages = config.message_config.messages;
+        const msg_ptr = allocator.create(std.json.Value) catch {
+            std.debug.print("Failed to allocate memory for messages\n", .{});
+            std.posix.exit(1);
+        };
+        msg_ptr.* = messages;
+        var norification = Notification.new(allocator, msg_ptr) catch {
             std.posix.exit(1);
         };
 
@@ -77,83 +85,28 @@ fn activate(app: *gtk.Application, user_data: ?*anyopaque) callconv(.c) void {
         gtk.Box.append(main_box, right_box.as(gtk.Widget));
 
         gtk.Widget.show(window.as(gtk.Widget));
-
     }
 }
+
 pub fn main() !void {
     var allocator = std.heap.page_allocator;
-
-    var iroha_dir = try config.getConfigDir(allocator);
-    defer iroha_dir.close();
-
-    const file_name = "message.jsonc";
-
-    var file = iroha_dir.openFile(file_name, .{.mode = .read_only}) catch |err| switch (err) {
-        error.FileNotFound => blk: {
-            var new_file = try iroha_dir.createFile(file_name, .{});
-            const initial_data =
-                \\{
-                \\    "messages": [
-                \\        "kick back",
-                \\        "iris out",
-                \\        "jane doe",
-                \\        ]
-                \\}
-            ;
-            try new_file.writeAll(initial_data);
-            try new_file.sync();
-            new_file.close();
-
-        break :blk try iroha_dir.openFile(file_name, .{.mode = .read_only});
-        },
-        else => return err,
-    };
-    defer file.close();
-
-    const file_size = try file.getEndPos();
-
-    const msgs_buffer = try allocator.alloc(u8, file_size);
-    defer allocator.free(msgs_buffer);
-
-    var reader = file.reader(msgs_buffer);
-    const messages = try reader.interface.readAlloc(allocator, file_size);
-
-    var jsonc_parser = try jsonc.JsoncParser.init(allocator, messages);
-    defer jsonc_parser.deinit();
-
-    const message_json = try jsonc_parser.parse();
-    if (message_json == .object) {
-        const msgs = message_json.object.get("messages");
-        if (msgs) |m| {
-            if (m == .array) {
-                std.debug.print("num of messages {d}\n", .{m.array.items.len});
-            }
-        }
-
-    } else {
-        std.debug.print("No messages", .{});
-    }
+    const config = try Config.init(allocator);
 
     var app = gtk.Application.new("org.iroha.systembar", .{});
     defer app.unref();
-        const message_ptr = try allocator.create(std.json.Value);
-        message_ptr.* = message_json;
+    
+    const config_ptr = try allocator.create(Config);
+    config_ptr.* = config;
+    
+    // const message_ptr = try allocator.create(std.json.Value);
+    // message_ptr.* = message_json;
 
-        _ = gio.Application.signals.activate.connect(app, ?*anyopaque, &activate, @ptrCast(message_ptr), .{});
+    // _ = gio.Application.signals.activate.connect(app, ?*anyopaque, &activate, @ptrCast(message_ptr), .{});
+    _ = gio.Application.signals.activate.connect(app, ?*anyopaque, &activate, @ptrCast(config_ptr), .{});
     const status = gio.Application.run(app.as(gio.Application), @intCast(std.os.argv.len), std.os.argv.ptr);
 
     std.process.exit(@intCast(status));
 }
 
-fn loadCss() anyerror!void {
-    const provider = gtk.CssProvider.new();
 
-    const css_path: [*:0]const u8 = "./src/style.css";
-    gtk.CssProvider.loadFromPath(provider, css_path);
 
-    const display = gdk.Display.getDefault() orelse {
-        return error.FailedToGetDisplay;
-    };
-
-    gtk.StyleContext.addProviderForDisplay(display, provider.as(gtk.StyleProvider), gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
-}

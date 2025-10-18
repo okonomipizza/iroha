@@ -20,7 +20,7 @@ const MessageNode = struct {
     pub fn create(allocator: std.mem.Allocator, message: []const u8) !*Self {
         const node = try allocator.create(Self);
         const c_message = try allocator.dupeZ(u8, message);
-        node.* = Self {
+        node.* = Self{
             // .message = try allocator.dupe(u8, message),
             .message = c_message.ptr,
             .prev = null,
@@ -47,16 +47,16 @@ const MessageManager = struct {
     tail: ?*MessageNode,
     /// Currently displayed/selected message node (null if empty).
     current: ?*MessageNode,
-    
+
     /// Maximum capacity lilmit.
     max_count: usize,
     /// Number of nodes currently stored in list.
     count: usize,
-    
+
     allocator: std.mem.Allocator,
 
     const Self = @This();
-    
+
     /// Creates a new MessageManager with the specified maximum message capacity.
     ///
     /// Caller must call `deinit()` when done to free all resources.
@@ -73,10 +73,10 @@ const MessageManager = struct {
 
         return manager;
     }
-    
+
     /// Create a new MessageNode to the end of the list
     /// If the list exceeds `max_count`, the oldest message is automatically removed.
- /// The message string is duplicated internally.
+    /// The message string is duplicated internally.
     pub fn append(self: *Self, message: []const u8) !void {
         if (self.count >= self.max_count) {
             self.removeOldest();
@@ -144,8 +144,6 @@ const MessageManager = struct {
         self.clear();
         self.allocator.destroy(self);
     }
-
-
 };
 
 /// A widget that displays messages with animations.
@@ -154,14 +152,14 @@ const MessageManager = struct {
 pub const Notification = extern struct {
     parent_instance: Parent,
     pub const Parent = gtk.Box;
-    
+
     const Private = struct {
         manager: ?*MessageManager,
         current_node: ?*MessageNode,
         // Currently displayed message.
         //
         current_message: ?[*:0]const u8, // Currently displayed message
-        
+
         main_hbox: *gtk.Box,
         icon_button: *gtk.Button,
         icon: *gtk.Image,
@@ -172,7 +170,7 @@ pub const Notification = extern struct {
         scroll_tick_id: c_uint, // For scroll animation tick callback
         frame_count: c_uint, // Counter for frame-based timing
         scroll_position: f64, // Current position of label at scrolled window
-        
+
         widget_width: c_int, // Width of message widget
         icon_width: c_int,
         text_width: c_int, // Width of the message label for display
@@ -180,9 +178,9 @@ pub const Notification = extern struct {
         popover: ?*gtk.Popover,
         var offset: c_int = 0;
     };
-    
+
     const Self = @This();
-    
+
     pub const getGObjectType = gobject.ext.defineClass(Self, .{
         .name = "IrohaNotification",
         .instanceInit = &init,
@@ -190,7 +188,7 @@ pub const Notification = extern struct {
         .parent_class = &Class.parent,
         .private = .{ .Type = Private, .offset = &Private.offset },
     });
-    
+
     /// Returns initialized instance
     pub fn new(allocator: std.mem.Allocator, config: ?*std.json.Value) !*Notification {
         var notification = gobject.ext.newInstance(Notification, .{});
@@ -202,13 +200,9 @@ pub const Notification = extern struct {
         priv.manager = try MessageManager.init(allocator, 10);
         if (priv.manager) |manager| {
             if (config) |cfg| {
-                if (cfg.* == .object) {
-                    if (cfg.object.get("messages")) |messages| {
-                        if (messages == .array) {
-                             for (messages.array.items) |item| {
-                                try manager.append(item.string);
-                            }
-                        }
+                if (cfg.* == .array) {
+                    for (cfg.array.items) |item| {
+                        try manager.append(item.string);
                     }
                 }
             }
@@ -281,10 +275,10 @@ pub const Notification = extern struct {
         }
         startAnimation(notification);
     }
-    
+
     fn init(notification: *Notification, _: *Class) callconv(.c) void {
         var priv = notification.private();
-        
+
         priv.current_message = null;
         priv.scroll_position = 0.0;
         priv.scroll_tick_id = 0;
@@ -316,8 +310,8 @@ pub const Notification = extern struct {
 
         priv.scrolled_window = gtk.ScrolledWindow.new();
         gtk.ScrolledWindow.setPolicy(
-            priv.scrolled_window, 
-            gtk.PolicyType.automatic, 
+            priv.scrolled_window,
+            gtk.PolicyType.automatic,
             gtk.PolicyType.never,
         );
         // Hide horizontal scroll bar
@@ -327,7 +321,7 @@ pub const Notification = extern struct {
 
         priv.label_hbox = gtk.Box.new(gtk.Orientation.horizontal, 10);
         gtk.ScrolledWindow.setChild(priv.scrolled_window, priv.label_hbox.as(gtk.Widget));
-        
+
         priv.label = gtk.Label.new("No message");
         gtk.Widget.setSizeRequest(priv.label.as(gtk.Widget), -1, 20);
         gtk.Label.setEllipsize(priv.label, pango.EllipsizeMode.none);
@@ -337,7 +331,6 @@ pub const Notification = extern struct {
         gtk.Box.append(priv.main_hbox, priv.scrolled_window.as(gtk.Widget));
         gtk.Box.append(notification.as(gtk.Box), priv.main_hbox.as(gtk.Widget));
 
-        
         gtk.Widget.show(notification.as(gtk.Widget));
     }
 
@@ -419,7 +412,6 @@ pub const Notification = extern struct {
         gtk.Box.append(container, notification_button.as(gtk.Widget));
 
         gtk.Box.append(box, container.as(gtk.Widget));
-        
     }
 
     fn createMenuItem(notification: *Notification, box: *gtk.Box, label: [*:0]const u8) void {
@@ -429,12 +421,12 @@ pub const Notification = extern struct {
         gtk.Widget.setMarginEnd(container.as(gtk.Widget), 1);
 
         const button = gtk.Button.newWithLabel(label);
-        
+
         // Set button styling
         const style_context = gtk.Widget.getStyleContext(button.as(gtk.Widget));
         gtk.StyleContext.addClass(style_context, "power-menu-item");
         gtk.StyleContext.removeClass(style_context, "button");
-        
+
         // Set button properties
         gtk.Widget.setHalign(button.as(gtk.Widget), gtk.Align.fill);
         gtk.Widget.setHexpand(button.as(gtk.Widget), 1);
@@ -446,7 +438,7 @@ pub const Notification = extern struct {
         if (button_child) |child| {
             gtk.Widget.setHalign(child, gtk.Align.center);
         }
-        
+
         gtk.Box.append(box, container.as(gtk.Widget));
     }
 
@@ -464,7 +456,7 @@ pub const Notification = extern struct {
             }
         }
     }
-    
+
     /// Update matadata of playing
     // fn updateMetadata(music: *Notification) void {
     //     var priv = music.private();
@@ -545,7 +537,7 @@ pub const Notification = extern struct {
     //         priv.text_width = 150;
     //     }
     // }
-    
+
     fn startAnimation(notification: *Notification) void {
         var priv = notification.private();
         // Stop existing tick callbacks
@@ -553,76 +545,71 @@ pub const Notification = extern struct {
             gtk.Widget.removeTickCallback(notification.as(gtk.Widget), priv.scroll_tick_id);
             priv.scroll_tick_id = 0;
         }
-         
-        priv.scroll_tick_id = gtk.Widget.addTickCallback(
-            notification.as(gtk.Widget),
-            &animateScrollTick,
-            notification,
-            null
-        );
+
+        priv.scroll_tick_id = gtk.Widget.addTickCallback(notification.as(gtk.Widget), &animateScrollTick, notification, null);
     }
-    
+
     fn animateScrollTick(widget: *gtk.Widget, frame_clock: *gdk.FrameClock, user_data: ?*anyopaque) callconv(.c) c_int {
         _ = widget;
         _ = frame_clock;
 
         if (user_data) |data| {
-                const notification: *Notification = @ptrCast(@alignCast(data));
-                var priv = notification.private();
+            const notification: *Notification = @ptrCast(@alignCast(data));
+            var priv = notification.private();
 
-                // Scroll to left from right.
-                const scroll_speed = 0.4;
-                priv.scroll_position -= scroll_speed;
-                
-                // Calculate the place where the animated text completely hides to the end.
-                const available_width = notification.availableWidth();
-                const text_hidden = @as(f64, @floatFromInt(-priv.text_width));
-                
-                if (priv.scroll_position <= text_hidden) {
-                    // Change displayed message to next.
-                    priv.scroll_position = @as(f64, @floatFromInt(available_width));
-                    if (priv.manager) |manager| {
-                        if (manager.next()) |next_node| {
-                            gtk.Label.setText(priv.label, next_node.message);
+            // Scroll to left from right.
+            const scroll_speed = 0.4;
+            priv.scroll_position -= scroll_speed;
 
-                            gtk.Widget.setMarginStart(priv.label.as(gtk.Widget), 0);
-                            gtk.Widget.setMarginEnd(priv.label.as(gtk.Widget), 0);
-                            gtk.Adjustment.setValue(gtk.ScrolledWindow.getHadjustment(priv.scrolled_window), 0.0);
+            // Calculate the place where the animated text completely hides to the end.
+            const available_width = notification.availableWidth();
+            const text_hidden = @as(f64, @floatFromInt(-priv.text_width));
 
-                            priv.current_message = next_node.message;
-                            
-                            var req: gtk.Requisition = undefined;
-                            gtk.Widget.getPreferredSize(priv.label.as(gtk.Widget), null, &req);
-                            priv.text_width = req.f_width;
-                            priv.scroll_position = @as(f64, @floatFromInt(available_width));
-                            
-                            std.posix.nanosleep(0, 900);
-                        }
+            if (priv.scroll_position <= text_hidden) {
+                // Change displayed message to next.
+                priv.scroll_position = @as(f64, @floatFromInt(available_width));
+                if (priv.manager) |manager| {
+                    if (manager.next()) |next_node| {
+                        gtk.Label.setText(priv.label, next_node.message);
+
+                        gtk.Widget.setMarginStart(priv.label.as(gtk.Widget), 0);
+                        gtk.Widget.setMarginEnd(priv.label.as(gtk.Widget), 0);
+                        gtk.Adjustment.setValue(gtk.ScrolledWindow.getHadjustment(priv.scrolled_window), 0.0);
+
+                        priv.current_message = next_node.message;
+
+                        var req: gtk.Requisition = undefined;
+                        gtk.Widget.getPreferredSize(priv.label.as(gtk.Widget), null, &req);
+                        priv.text_width = req.f_width;
+                        priv.scroll_position = @as(f64, @floatFromInt(available_width));
+
+                        std.posix.nanosleep(0, 900);
                     }
                 }
-                
-                // ラベルにマージンを設定してテキストを右にオフセット
-                if (priv.scroll_position > 0) {
-                    // In case of text start shown on display.
-                    gtk.Widget.setMarginStart(priv.label.as(gtk.Widget), @as(c_int, @intFromFloat(priv.scroll_position)));
-                    gtk.Widget.setMarginEnd(priv.label.as(gtk.Widget), 0);
-                    gtk.Adjustment.setValue(gtk.ScrolledWindow.getHadjustment(priv.scrolled_window), 0.0);
-                } else {
-                    // In case of text start is at left of start of display.
-                    gtk.Widget.setMarginStart(priv.label.as(gtk.Widget), 0);
-                    const margin_end = @as(c_int, @intFromFloat((-priv.scroll_position)));
-                    gtk.Widget.setMarginEnd(priv.label.as(gtk.Widget), margin_end);
-                    gtk.Adjustment.setValue(gtk.ScrolledWindow.getHadjustment(priv.scrolled_window), -priv.scroll_position);
-                }
-            
-                return 1;
             }
-            return 0;
+
+            // ラベルにマージンを設定してテキストを右にオフセット
+            if (priv.scroll_position > 0) {
+                // In case of text start shown on display.
+                gtk.Widget.setMarginStart(priv.label.as(gtk.Widget), @as(c_int, @intFromFloat(priv.scroll_position)));
+                gtk.Widget.setMarginEnd(priv.label.as(gtk.Widget), 0);
+                gtk.Adjustment.setValue(gtk.ScrolledWindow.getHadjustment(priv.scrolled_window), 0.0);
+            } else {
+                // In case of text start is at left of start of display.
+                gtk.Widget.setMarginStart(priv.label.as(gtk.Widget), 0);
+                const margin_end = @as(c_int, @intFromFloat((-priv.scroll_position)));
+                gtk.Widget.setMarginEnd(priv.label.as(gtk.Widget), margin_end);
+                gtk.Adjustment.setValue(gtk.ScrolledWindow.getHadjustment(priv.scrolled_window), -priv.scroll_position);
+            }
+
+            return 1;
+        }
+        return 0;
     }
 
     fn dispose(music: *Notification) callconv(.c) void {
         var priv = music.private();
-        
+
         if (priv.scroll_tick_id != 0) {
             gtk.Widget.removeTickCallback(music.as(gtk.Widget), priv.scroll_tick_id);
             priv.scroll_tick_id = 0;
@@ -632,20 +619,20 @@ pub const Notification = extern struct {
             manager.deinit();
             priv.manager = null;
         }
-        
+
         // if (priv.current_message) |ta| {
         //     if (priv.allocator) |allocator| {
         //         allocator.free(std.mem.span(ta));
         //     }
         // }
-        
+
         gobject.Object.virtual_methods.dispose.call(Class.parent, music.as(Parent));
     }
-    
+
     fn private(self: *Notification) *Private {
         return gobject.ext.impl_helpers.getPrivate(self, Private, Private.offset);
     }
-    
+
     pub fn as(music: *Notification, comptime T: type) *T {
         return gobject.ext.as(T, music);
     }
@@ -653,13 +640,13 @@ pub const Notification = extern struct {
     pub const Class = extern struct {
         parent_class: Parent.Class,
         var parent: *Parent.Class = undefined;
-        
+
         pub const Instance = Notification;
-        
+
         pub fn as(class: *Class, comptime T: type) *T {
             return gobject.ext.as(T, class);
         }
-        
+
         fn init(class: *Class) callconv(.c) void {
             gobject.Object.virtual_methods.dispose.implement(class, &dispose);
         }

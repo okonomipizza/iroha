@@ -4,7 +4,7 @@ const gobject = @import("gobject");
 const gtk = @import("gtk");
 
 const ClockMode = enum(c_int) {
-    time_only,  // HH:MM:SS
+    time_only, // HH:MM:SS
     date_time, // YYYY-MM-DD HH:MM:SS
     time_12h,
     date_time_12h,
@@ -27,7 +27,7 @@ pub const Clock = extern struct {
         .instanceInit = &init,
         .classInit = &Class.init,
         .parent_class = &Class.parent,
-        .private = .{ .Type = Private, .offset = &Private.offset},
+        .private = .{ .Type = Private, .offset = &Private.offset },
     });
 
     pub fn new(timezone_offset_hours: c_int) *Clock {
@@ -80,7 +80,7 @@ pub const Clock = extern struct {
         const timestamp = std.time.timestamp();
         const epoch_seconds = @as(u64, @intCast(timestamp));
         const local_seconds = epoch_seconds + @as(u64, @intCast(clock.private().timezone_offset_hours * 3600));
-        
+
         // Calculate date components
         const days_since_epoch = local_seconds / 86400;
         const seconds_today = local_seconds % 86400;
@@ -95,7 +95,7 @@ pub const Clock = extern struct {
         const day_of_year = days_since_epoch % 365;
         const month = (day_of_year / 30) + 1;
         const day = (day_of_year % 30) + 1;
-        
+
         const formatted = switch (clock.private().mode) {
             .time_only => std.fmt.bufPrintZ(buffer, "{:0>2}:{:0>2}:{:0>2}", .{ hours, minutes, seconds }),
             .date_time => std.fmt.bufPrintZ(buffer, "{:0>4}-{:0>2}-{:0>2} {:0>2}:{:0>2}:{:0>2}", .{ year, month, day, hours, minutes, seconds }),
@@ -114,11 +114,9 @@ pub const Clock = extern struct {
         } catch {
             return std.fmt.bufPrintZ(buffer, "00:00:00", .{}) catch unreachable;
         };
-        
+
         return formatted.ptr;
     }
-
-
 
     fn dispose(clock: *Clock) callconv(.c) void {
         // Clean up timer
@@ -150,7 +148,5 @@ pub const Clock = extern struct {
         }
     };
 
-
     const Self = @This();
-
 };
