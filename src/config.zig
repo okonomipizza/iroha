@@ -1,29 +1,46 @@
 const std = @import("std");
 const jsonc = @import("zig_jsonc");
 
+fn getWidgetConfig(root: std.json.Value, widget_name: []const u8) ?std.json.Value {
+    if (root != .object) return null;
+    if (root.object.get(widget_name)) |widget_config| {
+        if (widget_config != .object) return null;
+        return widget_config;
+    }
+    return null;
+}
+
+fn getWidgetThemeObj(root: std.json.Value, widget_name: []const u8) ?std.json.Value {
+    const widget_root = getWidgetConfig(root, widget_name) orelse return null;
+    const widget_theme = widget_root.object.get("theme") orelse return null;
+    if (widget_theme == .object) return widget_theme;
+    return null;
+}
+
 const MusicConfig = struct {
+    text: []const u8,
     color: []const u8,
 
     const Self = @This();
 
     fn init(config_json: std.json.Value) !Self {
-        if (config_json != .object) {
-            return error.InvalidMusicConfig;
-        }
-        if (config_json.object.get("music")) |music| {
-            if (music != .object) {
-                return error.InvalidMusic;
+        // default: dark violet
+        //
+        var text: []const u8 = "rgb(255, 255, 255)";
+        var color: []const u8 = "rgb(148, 0, 211)";
+
+        if (getWidgetThemeObj(config_json, "music")) |music_theme| {
+            if (music_theme.object.get("text")) |txt| {
+                text = txt.string;
             }
-            if (music.object.get("theme")) |theme| {
-                if (theme != .object) {
-                    return error.InvalidMusicTheme;
-                }
-                if (theme.object.get("border-color")) |border_color| {
-                    return .{ .color = border_color.string };
-                }
+            if (music_theme.object.get("border-color")) |bc| {
+                color = bc.string;
             }
         }
-        return error.InvalidMusicConfig;
+        return .{
+            .text = text,
+            .color = color,
+        };
     }
 };
 

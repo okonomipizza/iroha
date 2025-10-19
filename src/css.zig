@@ -21,8 +21,8 @@ pub fn loadCss(allocator: std.mem.Allocator, config: *const Config) anyerror!voi
 }
 
 fn generateCssVariables(allocator: std.mem.Allocator, config: *const Config) ![]const u8 {
-    const color_config = try ColorConfig.fromRgba(config.music_config.color);
-    const music_colors = try color_config.generateColorVariants(allocator);
+    const music_color_cfg = try ColorConfig.fromRgba(config.music_config.color);
+    const music_colors = try music_color_cfg.generateColorVariants(allocator);
 
     // const clock_color_config = try ColorConfig.fromRgba(config.music_config.color);
     // const clock_colors = try clock_color_config.generateColorVariants(allocator);
@@ -36,13 +36,6 @@ fn generateCssVariables(allocator: std.mem.Allocator, config: *const Config) ![]
         \\    --color-black-light: rgba(0, 0, 0, 0.2);
         \\    --color-transparent: transparent;
         \\    
-        \\    /* Accent colors */
-        \\    --color-green: rgba(173, 255, 47, 0.8);
-        \\    --color-green-bright: rgba(173, 255, 47, 1.0);
-        \\    --color-green-dim: rgba(173, 255, 47, 0.6);
-        \\    --color-green-light: rgba(173, 255, 47, 0.2);
-        \\    --color-green-dimmer: rgba(173, 255, 47, 0.9);
-        \\    
         \\    --color-orange: rgba(255, 95, 0, 1.0);
         \\    --color-orange-light: rgba(255, 95, 0, 0.2);
         \\    --color-orange-medium: rgba(255, 95, 0, 0.3);
@@ -50,9 +43,9 @@ fn generateCssVariables(allocator: std.mem.Allocator, config: *const Config) ![]
         \\    --color-orange-dimmer: rgba(255, 95, 0, 0.9);
         \\
         \\    --color-music: {s};
-        \\    --color-music-bright: {s};
-        \\    --color-music-dim: {s};
         \\    --color-music-light: {s};
+        \\    --color-music-medium: {s};
+        \\    --color-music-dim: {s};
         \\    --color-music-dimmer: {s};
         \\
         \\    --color-clock: rgba(0,255,255, 1.0);
@@ -183,8 +176,8 @@ fn generateMusicCss(allocator: std.mem.Allocator, config: *const Config) ![]cons
         \\}}
         \\
         \\.music-icon-button:hover {{
-        \\    color: var(--color-music-bright);
-        \\    border-color: var(--color-music-dimmer);
+        \\    color: var(--color-white);
+        \\    border-color: var(--color-music-medium);
         \\    background-color: var(--color-music-light);
         \\}}
         \\
@@ -228,6 +221,7 @@ fn generateClockCss(allocator: std.mem.Allocator, config: *const Config) ![]cons
     , .{});
     return css;
 }
+
 fn generateCssFromConfig(allocator: std.mem.Allocator, config: *const Config) ![]const u8 {
     const root_css = try generateCssVariables(allocator, config);
     const system_css = try generateSystemCss(allocator, config);
