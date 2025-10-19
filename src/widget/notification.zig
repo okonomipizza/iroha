@@ -157,12 +157,9 @@ pub const Notification = extern struct {
         manager: ?*MessageManager,
         current_node: ?*MessageNode,
         // Currently displayed message.
-        //
         current_message: ?[*:0]const u8, // Currently displayed message
 
         main_hbox: *gtk.Box,
-        icon_button: *gtk.Button,
-        icon: *gtk.Image,
         scrolled_window: *gtk.ScrolledWindow, // Enables horizontal scrolling for the label content
         label_hbox: *gtk.Box,
         label: *gtk.Label, // Displays the media information string (title | artist)
@@ -172,7 +169,7 @@ pub const Notification = extern struct {
         scroll_position: f64, // Current position of label at scrolled window
 
         widget_width: c_int, // Width of message widget
-        icon_width: c_int,
+        // icon_width: c_int,
         text_width: c_int, // Width of the message label for display
         allocator: ?std.mem.Allocator,
         var offset: c_int = 0;
@@ -193,7 +190,6 @@ pub const Notification = extern struct {
         var notification = gobject.ext.newInstance(Notification, .{});
         const notification_style_context = gtk.Widget.getStyleContext(notification.as(gtk.Widget));
         gtk.StyleContext.addClass(notification_style_context, "notification");
-        notification.setIcon();
 
         var priv = notification.private();
         priv.manager = try MessageManager.init(allocator, 10);
@@ -241,7 +237,7 @@ pub const Notification = extern struct {
     /// Calculate width of available area for text animation
     fn availableWidth(self: *Notification) c_int {
         const priv = self.private();
-        return priv.widget_width - priv.icon_width - 8; // 8 is a padding width
+        return priv.widget_width - 8; // 8 is a padding width
     }
 
     fn setDisplayedMessage(notification: *Notification, allocator: std.mem.Allocator, msg: []const u8) !void {
@@ -251,18 +247,6 @@ pub const Notification = extern struct {
         }
         const c_message = try allocator.dupeZ(u8, msg);
         priv.current_message = c_message.ptr;
-    }
-
-    fn setIcon(music: *Notification) void {
-        const priv = music.private();
-        gtk.Image.setFromIconName(priv.icon, "view-list");
-        return;
-    }
-
-    fn updateIconForPlayingState(music: *Notification, is_playing: bool) void {
-        const priv = music.private();
-        priv.is_playing = is_playing;
-        music.setIcon();
     }
 
     fn initializeWithAllocator(notification: *Notification) void {
@@ -282,26 +266,10 @@ pub const Notification = extern struct {
         priv.scroll_tick_id = 0;
         priv.frame_count = 0;
         priv.widget_width = 300;
-        priv.icon_width = 24;
         priv.text_width = 0;
         priv.allocator = null;
 
         priv.main_hbox = gtk.Box.new(gtk.Orientation.horizontal, 8);
-        priv.icon_button = gtk.Button.new();
-        priv.icon = gtk.Image.new();
-
-        // Icon button configuration
-        gtk.Button.setChild(priv.icon_button, priv.icon.as(gtk.Widget));
-        gtk.Widget.setSizeRequest(priv.icon_button.as(gtk.Widget), priv.icon_width, 20);
-        gtk.Widget.setHalign(priv.icon_button.as(gtk.Widget), gtk.Align.start);
-        gtk.Widget.setValign(priv.icon_button.as(gtk.Widget), gtk.Align.center);
-        // Apply CSS styling to icon button and icon
-        const button_style_context = gtk.Widget.getStyleContext(priv.icon_button.as(gtk.Widget));
-        gtk.StyleContext.addClass(button_style_context, "notification-icon-button");
-        const icon_style_context = gtk.Widget.getStyleContext(priv.icon.as(gtk.Widget));
-        gtk.StyleContext.addClass(icon_style_context, "notification-icon");
-
-        gtk.Box.append(priv.main_hbox, priv.icon_button.as(gtk.Widget));
 
         priv.scrolled_window = gtk.ScrolledWindow.new();
         gtk.ScrolledWindow.setPolicy(
@@ -311,7 +279,7 @@ pub const Notification = extern struct {
         );
         // Hide horizontal scroll bar
         gtk.Widget.setVisible(gtk.ScrolledWindow.getHscrollbar(priv.scrolled_window).as(gtk.Widget), 0);
-        const scroll_width = priv.widget_width - priv.icon_width - 8; // 8 is a padding left value
+        const scroll_width = priv.widget_width - 8; // 8 is a padding left value
         gtk.Widget.setSizeRequest(priv.scrolled_window.as(gtk.Widget), scroll_width, 20);
 
         priv.label_hbox = gtk.Box.new(gtk.Orientation.horizontal, 10);
