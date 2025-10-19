@@ -21,11 +21,17 @@ pub fn loadCss(allocator: std.mem.Allocator, config: *const Config) anyerror!voi
 }
 
 fn generateCssVariables(allocator: std.mem.Allocator, config: *const Config) ![]const u8 {
+    const system_color_cfg = try ColorConfig.fromRgba(config.system_config.color);
+    const system_colors = try system_color_cfg.generateColorVariants(allocator);
+
     const music_color_cfg = try ColorConfig.fromRgba(config.music_config.color);
     const music_colors = try music_color_cfg.generateColorVariants(allocator);
 
-    // const clock_color_config = try ColorConfig.fromRgba(config.music_config.color);
-    // const clock_colors = try clock_color_config.generateColorVariants(allocator);
+    const message_color_cfg = try ColorConfig.fromRgba(config.message_config.color);
+    const message_colors = try message_color_cfg.generateColorVariants(allocator);
+
+    const clock_color_cfg = try ColorConfig.fromRgba(config.clock_config.color);
+    const clock_colors = try clock_color_cfg.generateColorVariants(allocator);
 
     const css = try std.fmt.allocPrint(allocator,
         \\:root {{
@@ -34,13 +40,14 @@ fn generateCssVariables(allocator: std.mem.Allocator, config: *const Config) ![]
         \\    --color-black: rgba(0, 0, 0, 0.7);
         \\    --color-black-dark: rgba(0, 0, 0, 1.0);
         \\    --color-black-light: rgba(0, 0, 0, 0.2);
+        \\    --color-gray: rgba(49, 49, 49, 1);
         \\    --color-transparent: transparent;
         \\    
-        \\    --color-orange: rgba(255, 95, 0, 1.0);
-        \\    --color-orange-light: rgba(255, 95, 0, 0.2);
-        \\    --color-orange-medium: rgba(255, 95, 0, 0.3);
-        \\    --color-orange-dim: rgba(255, 95, 0, 0.6);
-        \\    --color-orange-dimmer: rgba(255, 95, 0, 0.9);
+        \\    --color-system: {s};
+        \\    --color-system-light: {s};
+        \\    --color-system-medium: {s};
+        \\    --color-system-dim: {s};
+        \\    --color-system-dimmer: {s};
         \\
         \\    --color-music: {s};
         \\    --color-music-light: {s};
@@ -48,11 +55,17 @@ fn generateCssVariables(allocator: std.mem.Allocator, config: *const Config) ![]
         \\    --color-music-dim: {s};
         \\    --color-music-dimmer: {s};
         \\
-        \\    --color-clock: rgba(0,255,255, 1.0);
-        \\    --color-clock-bright: rgba(0, 255, 255, 0.2);
-        \\    --color-clock-dim: rgba(0, 255, 255, 0.2);
-        \\    --color-clock-light: rgba(0, 255, 255, 0.2);
-        \\    --color-clock-dimmer: rgba(0, 255, 255, 0.2);
+        \\    --color-notification: {s};
+        \\    --color-notification-light: {s};
+        \\    --color-notification-medium: {s};
+        \\    --color-notification-dim: {s};
+        \\    --color-notification-dimmer: {s};
+        \\
+        \\    --color-clock: {s};
+        \\    --color-clock-light: {s};
+        \\    --color-clock-medium: {s};
+        \\    --color-clock-dim: {s};
+        \\    --color-clock-dimmer: {s};
         \\    
         \\    /* Measurements */
         \\    --border-radius-small: 4px;
@@ -68,11 +81,26 @@ fn generateCssVariables(allocator: std.mem.Allocator, config: *const Config) ![]
         \\    --transition-fast: 0.2s ease;
         \\}}        
     , .{
+        system_colors.base,
+        system_colors.bright,
+        system_colors.dim,
+        system_colors.light,
+        system_colors.dimmer,
         music_colors.base,
         music_colors.bright,
         music_colors.dim,
         music_colors.light,
         music_colors.dimmer,
+        message_colors.base,
+        message_colors.bright,
+        message_colors.dim,
+        message_colors.light,
+        message_colors.dimmer,
+        clock_colors.base,
+        clock_colors.bright,
+        clock_colors.dim,
+        clock_colors.light,
+        clock_colors.dimmer,
     });
     return css;
 }
@@ -94,13 +122,13 @@ fn generateSystemCss(allocator: std.mem.Allocator, config: *const Config) ![]con
         \\}}
         \\
         \\button.system-button:hover image {{
-        \\    color: var(--color-green-bright);
-        \\    -gtk-icon-palette: success var(--color-green-bright);
+        \\    color: var(--color-system-light);
+        \\    -gtk-icon-palette: success var(--color-system-light);
         \\}}
         \\
         \\button.system-button.active image {{
-        \\    color: var(--color-green-bright);
-        \\    -gtk-icon-palette: success var(--color-green-bright);
+        \\    color: var(--color-system-light);
+        \\    -gtk-icon-palette: success var(--color-system-light);
         \\}}
         \\
         \\popover.system-menu {{
@@ -141,8 +169,8 @@ fn generateSystemCss(allocator: std.mem.Allocator, config: *const Config) ![]con
         \\}}
         \\
         \\.system-menu-item:hover {{
-        \\    background-color: var(--color-green-light);
-        \\    color: var(--color-green);
+        \\    background-color: var(--color-gray);
+        \\    color: var(--color-system);
         \\}}
     , .{});
     return css;
@@ -195,6 +223,23 @@ fn generateMusicCss(allocator: std.mem.Allocator, config: *const Config) ![]cons
     return css;
 }
 
+fn generateNotificationCss(allocator: std.mem.Allocator, config: *const Config) ![]const u8 {
+    _ = config;
+    const css = try std.fmt.allocPrint(allocator,
+        \\.notification {{
+        \\    color: var(--color-white);
+        \\    font-size: 12px;
+        \\    min-height: 20px;
+        \\    max-height: 20px;
+        \\    margin: 2px 6px;
+        \\    background-color: var(--color-black-light);
+        \\    border: 1px solid var(--color-notification);
+        \\    border-radius: var(--border-radius-large);
+        \\}}
+    , .{});
+    return css;
+}
+
 fn generateClockCss(allocator: std.mem.Allocator, config: *const Config) ![]const u8 {
     _ = config;
     const css = try std.fmt.allocPrint(allocator,
@@ -226,8 +271,10 @@ fn generateCssFromConfig(allocator: std.mem.Allocator, config: *const Config) ![
     const root_css = try generateCssVariables(allocator, config);
     const system_css = try generateSystemCss(allocator, config);
     const music_css = try generateMusicCss(allocator, config);
+    const notification_css = try generateNotificationCss(allocator, config);
     const clock_css = try generateClockCss(allocator, config);
     const css = try std.fmt.allocPrint(allocator,
+        \\{s}
         \\{s}
         \\{s}
         \\{s}
@@ -242,92 +289,7 @@ fn generateCssFromConfig(allocator: std.mem.Allocator, config: *const Config) ![
         \\}}
         \\
         \\
-        \\.notification {{
-        \\    color: var(--color-white);
-        \\    font-size: 12px;
-        \\    min-height: 20px;
-        \\    max-height: 20px;
-        \\    margin: 2px 6px;
-        \\    background-color: var(--color-black-light);
-        \\    border: 1px solid var(--color-orange-dim);
-        \\    border-radius: var(--border-radius-large);
-        \\}}
-        \\
-        \\.notification-icon-button {{
-        \\    margin-left: 8px;
-        \\    margin-right: 2px;
-        \\    margin-top: 4px;
-        \\    margin-bottom: 4px;
-        \\    padding: 0px;
-        \\    min-width: 24px;
-        \\    min-height: 16px;
-        \\    border: 1px solid var(--color-orange-dim);
-        \\    border-radius: var(--border-radius-xlarge);
-        \\    background: var(--color-transparent);
-        \\    background-color: var(--color-transparent);
-        \\}}
-        \\
-        \\.notification-icon-button:hover {{
-        \\    color: var(--color-green-bright);
-        \\    border-color: var(--color-orange-dimmer);
-        \\    background-color: var(--color-orange-light);
-        \\}}
-        \\
-        \\.notification-icon {{
-        \\    color: var(--color-orange);
-        \\    padding-left: 4px;
-        \\    padding-right: 2px;
-        \\    padding-top: 1px;
-        \\    padding-bottom: 1px;
-        \\    min-width: 16px;
-        \\    min-height: 16px;
-        \\    -gtk-icon-size: 16px;
-        \\}}
-        \\
-        \\popover.notification-menu {{
-        \\    background: var(--color-transparent);
-        \\    border: none;
-        \\    padding: 0;
-        \\    margin: 0;
-        \\}}
-        \\
-        \\popover.notification-menu > contents {{
-        \\    background: var(--color-transparent);
-        \\    border: none;
-        \\    padding: 0;
-        \\    margin: 0;
-        \\}}
-        \\
-        \\.notification-menu-box {{
-        \\    background-color: var(--color-black-dark);
-        \\    backdrop-filter: var(--blur-heavy);
-        \\    border: none;
-        \\    border-radius: var(--border-radius-medium);
-        \\    padding: 8px, 8px;
-        \\    margin: 0;
-        \\    min-width: 250px;
-        \\}}
-        \\
-        \\.notification-menu-item {{
-        \\    color: var(--color-white);
-        \\    background-color: var(--color-transparent);
-        \\    background: var(--color-transparent);
-        \\    backdrop-filter: var(--blur-heavy);
-        \\    border: none;
-        \\    padding: 4px 16px;
-        \\    margin: 4px 8px;
-        \\    font-size: 12px;
-        \\    text-align: left;
-        \\    display: block;
-        \\    border-radius: var(--border-radius-small);
-        \\    transition: background-color var(--transition-fast);
-        \\}}
-        \\
-        \\.notification-menu-item:hover {{
-        \\    background-color: var(--color-green-light);
-        \\    color: var(--color-green);
-        \\}}
-    , .{ root_css, system_css, music_css, clock_css });
+    , .{ root_css, system_css, music_css, notification_css, clock_css });
 
     return css;
 }

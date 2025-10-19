@@ -17,6 +17,26 @@ fn getWidgetThemeObj(root: std.json.Value, widget_name: []const u8) ?std.json.Va
     return null;
 }
 
+/// For power control
+const SystemConfig = struct {
+    color: []const u8,
+
+    const Self = @This();
+
+    fn init(config_json: std.json.Value) !Self {
+        // default: dark violet
+        var color: []const u8 = "rgb(148, 0, 211)";
+
+        if (getWidgetThemeObj(config_json, "system")) |music_theme| {
+            if (music_theme.object.get("color")) |bc| {
+                color = bc.string;
+            }
+        }
+        return .{
+            .color = color,
+        };
+    }
+};
 const MusicConfig = struct {
     text: []const u8,
     color: []const u8,
@@ -25,7 +45,6 @@ const MusicConfig = struct {
 
     fn init(config_json: std.json.Value) !Self {
         // default: dark violet
-        //
         var text: []const u8 = "rgb(255, 255, 255)";
         var color: []const u8 = "rgb(148, 0, 211)";
 
@@ -33,7 +52,7 @@ const MusicConfig = struct {
             if (music_theme.object.get("text")) |txt| {
                 text = txt.string;
             }
-            if (music_theme.object.get("border-color")) |bc| {
+            if (music_theme.object.get("color")) |bc| {
                 color = bc.string;
             }
         }
@@ -47,29 +66,66 @@ const MusicConfig = struct {
 const MessageConfig = struct {
     // This value must to be an array of string
     messages: std.json.Value,
+    text: []const u8,
+    color: []const u8,
 
     const Self = @This();
 
     fn init(config_json: std.json.Value) !Self {
-        if (config_json != .object) {
-            return error.InvalidMusicConfig;
+        var text: []const u8 = "rgb(255, 255, 255)";
+        var color: []const u8 = "rgb(255, 95, 0)";
+
+        if (getWidgetThemeObj(config_json, "messages")) |messages_theme| {
+            if (messages_theme.object.get("text")) |txt| {
+                text = txt.string;
+            }
+            if (messages_theme.object.get("color")) |bc| {
+                color = bc.string;
+            }
         }
         if (config_json.object.get("messages")) |messages| {
             if (messages != .object) {
                 return error.InvalidMessages;
             }
+
             if (messages.object.get("default")) |default| {
-                return .{ .messages = default };
+                return .{ 
+                    .text = text,
+                    .color = color,
+                    .messages = default };
             }
         }
+
         return error.InvalidMusicConfig;
+    }
+};
+
+const ClockConfig = struct {
+    color: []const u8,
+
+    const Self = @This();
+
+    fn init(config_json: std.json.Value) !Self {
+        // default: dark violet
+        var color: []const u8 = "rgb(255, 255, 255)";
+
+        if (getWidgetThemeObj(config_json, "clock")) |color_theme| {
+            if (color_theme.object.get("color")) |c| {
+                color = c.string;
+            }
+        }
+        return .{
+            .color = color,
+        };
     }
 };
 
 // App config
 pub const Config = struct {
+    system_config: SystemConfig,
     music_config: MusicConfig,
     message_config: MessageConfig,
+    clock_config: ClockConfig,
     parser: jsonc.JsoncParser,
 
     const Self = @This();
@@ -120,12 +176,16 @@ pub const Config = struct {
         const config_json = try jsonc_parser.parse();
         if (config_json != .object) return error.InvalidConfig;
 
+        const system_config = try SystemConfig.init(config_json);
         const music_config = try MusicConfig.init(config_json);
         const messages_config = try MessageConfig.init(config_json);
+        const clock_config = try ClockConfig.init(config_json);
 
         return .{
+            .system_config = system_config,
             .music_config = music_config,
             .message_config = messages_config,
+            .clock_config = clock_config,
             .parser = jsonc_parser,
         };
     }
