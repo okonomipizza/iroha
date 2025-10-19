@@ -153,6 +153,8 @@ pub const Notification = extern struct {
     parent_instance: Parent,
     pub const Parent = gtk.Box;
 
+    const PADDING_HORIZONTAL: c_int = 8;
+
     const Private = struct {
         manager: ?*MessageManager,
         current_node: ?*MessageNode,
@@ -237,7 +239,7 @@ pub const Notification = extern struct {
     /// Calculate width of available area for text animation
     fn availableWidth(self: *Notification) c_int {
         const priv = self.private();
-        return priv.widget_width - 8; // 8 is a padding width
+        return priv.widget_width - PADDING_HORIZONTAL * 2;
     }
 
     fn setDisplayedMessage(notification: *Notification, allocator: std.mem.Allocator, msg: []const u8) !void {
@@ -269,7 +271,9 @@ pub const Notification = extern struct {
         priv.text_width = 0;
         priv.allocator = null;
 
-        priv.main_hbox = gtk.Box.new(gtk.Orientation.horizontal, 8);
+        priv.main_hbox = gtk.Box.new(gtk.Orientation.horizontal, 0);
+        gtk.Widget.setMarginStart(priv.main_hbox.as(gtk.Widget), PADDING_HORIZONTAL);
+        gtk.Widget.setMarginEnd(priv.main_hbox.as(gtk.Widget), PADDING_HORIZONTAL);
 
         priv.scrolled_window = gtk.ScrolledWindow.new();
         gtk.ScrolledWindow.setPolicy(
@@ -279,8 +283,9 @@ pub const Notification = extern struct {
         );
         // Hide horizontal scroll bar
         gtk.Widget.setVisible(gtk.ScrolledWindow.getHscrollbar(priv.scrolled_window).as(gtk.Widget), 0);
-        const scroll_width = priv.widget_width - 8; // 8 is a padding left value
+        const scroll_width = priv.widget_width - PADDING_HORIZONTAL * 2;
         gtk.Widget.setSizeRequest(priv.scrolled_window.as(gtk.Widget), scroll_width, 20);
+        gtk.Widget.setOverflow(priv.scrolled_window.as(gtk.Widget), gtk.Overflow.hidden);
 
         priv.label_hbox = gtk.Box.new(gtk.Orientation.horizontal, 10);
         gtk.ScrolledWindow.setChild(priv.scrolled_window, priv.label_hbox.as(gtk.Widget));
@@ -347,7 +352,7 @@ pub const Notification = extern struct {
                 }
             }
 
-            // ラベルにマージンを設定してテキストを右にオフセット
+            // Offset text to the right by setting label margin
             if (priv.scroll_position > 0) {
                 // In case of text start shown on display.
                 gtk.Widget.setMarginStart(priv.label.as(gtk.Widget), @as(c_int, @intFromFloat(priv.scroll_position)));
