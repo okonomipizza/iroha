@@ -53,10 +53,6 @@ pub const SystemMenu = extern struct {
 
         // Create box to hold icon
         const box = gtk.Box.new(gtk.Orientation.horizontal, 0);
-        
-        // Create and set PNG icon
-
-        // const icon_image = gtk.Image.newFromFile("assets/bird2_new.png");
 
         const icon_image = gtk.Image.newFromIconName("view-grid-symbolic");
         priv.menu_icon = icon_image;
@@ -85,7 +81,7 @@ pub const SystemMenu = extern struct {
 
         menu.private().popover = popover;
         const popover_style_context = gtk.Widget.getStyleContext(popover.as(gtk.Widget));
-        gtk.StyleContext.addClass(popover_style_context, "power-menu");
+        gtk.StyleContext.addClass(popover_style_context, "system-menu");
 
         _ = gtk.Popover.signals.activate_default.connect(popover, ?*anyopaque, &onPopoverShow, menu, .{});
         _ = gtk.Popover.signals.closed.connect(popover, ?*anyopaque, &onPopoverHide, menu, .{});
@@ -100,15 +96,13 @@ pub const SystemMenu = extern struct {
         gtk.Popover.setChild(popover, box.as(gtk.Widget));
 
         const box_style_context = gtk.Widget.getStyleContext(box.as(gtk.Widget));
-        gtk.StyleContext.addClass(box_style_context, "power-menu-box");
+        gtk.StyleContext.addClass(box_style_context, "system-menu-box");
 
         // Create menu items
         menu.createMenuItem(box, "sleep", Action.sleep);
         menu.createMenuItem(box, "restart", Action.restart);
         menu.createMenuItem(box, "shutdown", Action.shutdown);
     }
-
-    
 
     fn onPopoverShow(_: *gtk.Popover, menu: ?*anyopaque) callconv(.c) void {
         if (menu) |m| {
@@ -135,7 +129,7 @@ pub const SystemMenu = extern struct {
 
         // Set button styling
         const style_context = gtk.Widget.getStyleContext(button.as(gtk.Widget));
-        gtk.StyleContext.addClass(style_context, "power-menu-item");
+        gtk.StyleContext.addClass(style_context, "system-menu-item");
         gtk.StyleContext.removeClass(style_context, "button");
 
         // Set button properties

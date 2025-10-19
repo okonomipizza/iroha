@@ -6,7 +6,7 @@ const gdk = @import("gdk");
 
 pub fn loadCss(allocator: std.mem.Allocator, config: *const Config) anyerror!void {
     const provider = gtk.CssProvider.new();
-    const css_data = try generateCssFromConfig(allocator, config); 
+    const css_data = try generateCssFromConfig(allocator, config);
     defer allocator.free(css_data);
     const css_data_z = try allocator.dupeZ(u8, css_data);
     defer allocator.free(css_data_z);
@@ -26,13 +26,13 @@ fn generateCssVariables(allocator: std.mem.Allocator, config: *const Config) ![]
 
     // const clock_color_config = try ColorConfig.fromRgba(config.music_config.color);
     // const clock_colors = try clock_color_config.generateColorVariants(allocator);
-    
+
     const css = try std.fmt.allocPrint(allocator,
         \\:root {{
         \\    /* Base colors */
         \\    --color-white: #ffffff;
         \\    --color-black: rgba(0, 0, 0, 0.7);
-        \\    --color-black-dark: rgba(0, 0, 0, 0.8);
+        \\    --color-black-dark: rgba(0, 0, 0, 1.0);
         \\    --color-black-light: rgba(0, 0, 0, 0.2);
         \\    --color-transparent: transparent;
         \\    
@@ -82,7 +82,7 @@ fn generateCssVariables(allocator: std.mem.Allocator, config: *const Config) ![]
         music_colors.dimmer,
     });
     return css;
-} 
+}
 
 fn generateSystemCss(allocator: std.mem.Allocator, config: *const Config) ![]const u8 {
     _ = config;
@@ -103,6 +103,53 @@ fn generateSystemCss(allocator: std.mem.Allocator, config: *const Config) ![]con
         \\button.system-button:hover image {{
         \\    color: var(--color-green-bright);
         \\    -gtk-icon-palette: success var(--color-green-bright);
+        \\}}
+        \\
+        \\button.system-button.active image {{
+        \\    color: var(--color-green-bright);
+        \\    -gtk-icon-palette: success var(--color-green-bright);
+        \\}}
+        \\
+        \\popover.system-menu {{
+        \\    background: var(--color-transparent);
+        \\    border: none;
+        \\    padding: 0;
+        \\    margin: 0;
+        \\}}
+        \\
+        \\popover.system-menu > contents {{
+        \\    background: var(--color-transparent);
+        \\    border: none;
+        \\    padding: 0;
+        \\    margin: 0;
+        \\}}
+        \\
+        \\.system-menu-box {{
+        \\    background-color: var(--color-black-dark);
+        \\    backdrop-filter: var(--blur-heavy);
+        \\    border: none;
+        \\    border-radius: var(--border-radius-medium);
+        \\    padding: 8px;
+        \\    margin: 0;
+        \\    min-width: 250px;
+        \\}}
+        \\
+        \\.system-menu-item {{
+        \\    color: var(--color-white);
+        \\    background-color: var(--color-transparent);
+        \\    background: var(--color-transparent);
+        \\    border: none;
+        \\    padding: 4px 16px;
+        \\    margin: 4px 8px;
+        \\    font-size: 12px;
+        \\    text-align: left;
+        \\    border-radius: var(--border-radius-small);
+        \\    transition: background-color var(--transition-fast);
+        \\}}
+        \\
+        \\.system-menu-item:hover {{
+        \\    background-color: var(--color-green-light);
+        \\    color: var(--color-green);
         \\}}
     , .{});
     return css;
@@ -286,7 +333,7 @@ fn generateCssFromConfig(allocator: std.mem.Allocator, config: *const Config) ![
         \\    background-color: var(--color-green-light);
         \\    color: var(--color-green);
         \\}}
-    , .{root_css, system_css, music_css, clock_css});
+    , .{ root_css, system_css, music_css, clock_css });
 
     return css;
 }
@@ -314,11 +361,11 @@ const ColorConfig = struct {
         const g = try std.fmt.parseInt(u8, g_str, 10);
         const b = try std.fmt.parseInt(u8, b_str, 10);
 
-        return ColorConfig{.r = r, .g = g, .b = b};
+        return ColorConfig{ .r = r, .g = g, .b = b };
     }
 
     pub fn toRgba(self: ColorConfig, alpha: f32, allocator: std.mem.Allocator) ![]const u8 {
-        return std.fmt.allocPrint(allocator, "rgba({d}, {d}, {d}, {d:.1})", .{ self.r, self.g, self.b, alpha});
+        return std.fmt.allocPrint(allocator, "rgba({d}, {d}, {d}, {d:.1})", .{ self.r, self.g, self.b, alpha });
     }
 
     fn generateColorVariants(self: Self, allocator: std.mem.Allocator) !struct {

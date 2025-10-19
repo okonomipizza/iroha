@@ -94,15 +94,12 @@ pub fn main() !void {
 
     var app = gtk.Application.new("org.iroha.systembar", .{});
     defer app.unref();
-    
+
     const config_ptr = try allocator.create(Config);
     config_ptr.* = config;
-    
+
     _ = gio.Application.signals.activate.connect(app, ?*anyopaque, &activate, @ptrCast(config_ptr), .{});
     const status = gio.Application.run(app.as(gio.Application), @intCast(std.os.argv.len), std.os.argv.ptr);
 
     std.process.exit(@intCast(status));
 }
-
-
-
