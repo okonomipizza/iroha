@@ -2,7 +2,8 @@
   description = "Status bar";
 
   inputs = {
-    nixpkgs.url = "https://channels.nixos.org/nixos-25.05/nixexprs.tar.xz";
+    # nixpkgs.url = "https://channels.nixos.org/nixos-25.05/nixexprs.tar.xz";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
 
     zig = {
@@ -39,21 +40,21 @@
             inherit system;
           };
 
-          # packages.${system} = let
-          #   mkArgs = optimize: {
-          #     inherit optimize;
-          #
-          #     revision = self.shortRev or self.dirtyShortRev or "dirty";
-          #     zig = zig.packages.${system}."0.15.1";
-          #   };
-          # in rec {
-          #   iroha-debug = pkgs.callPackage ./package.nix (mkArgs "Debug");
-          #   iroha-releasesafe = pkgs.callPackage ./package.nix (mkArgs "ReleaseSafe");
-          #   iroha-releasefast = pkgs.callPackage ./package.nix (mkArgs "ReleaseFast");
-          #
-          #   jsonc-fmt = jsonc-fmt-releasefast;
-          #   default = jsonc-fmt;
-          # };
+          packages.${system} = let
+            mkArgs = optimize: {
+              inherit optimize;
+
+              revision = self.shortRev or self.dirtyShortRev or "dirty";
+              zig = zig.packages.${system}."0.15.1";
+            };
+          in rec {
+            iroha-debug = pkgs.callPackage ./nix/package.nix (mkArgs "Debug");
+            iroha-releasesafe = pkgs.callPackage ./nix/package.nix (mkArgs "ReleaseSafe");
+            iroha-releasefast = pkgs.callPackage ./nix/package.nix (mkArgs "ReleaseFast");
+
+            iroha = iroha-releasefast;
+            default = iroha;
+          };
 
           formatter.${system} = pkgs.alejandra;
         }

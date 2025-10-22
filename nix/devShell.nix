@@ -7,16 +7,16 @@
     pkg-config,
     pkgs,
     fetchurl,
-  gobject-introspection,
-  glib,
-  cairo,
-  pango,
-  gdk-pixbuf,
-  libadwaita,
-  adwaita-icon-theme,
-  hicolor-icon-theme,
-  zstd,
-  zls,
+    gobject-introspection,
+    glib,
+    cairo,
+    pango,
+    gdk-pixbuf,
+    libadwaita,
+    adwaita-icon-theme,
+    hicolor-icon-theme,
+    zstd,
+    zls,
 }: let
     zig-gobject-bindings = fetchurl {
         name = "bindings-gnome46.tar.zst";
@@ -63,7 +63,7 @@
             echo "  ✓ zig-gobject bindings already available"
         fi
 
-        # GIR/TypeLib パスを設定
+        # GIR/TypeLib path
           export GI_TYPELIB_PATH="${pkgs.gtk4}/lib/girepository-1.0:${pkgs.libadwaita}/lib/girepository-1.0:${pkgs.glib}/lib/girepository-1.0:${pkgs.cairo}/lib/girepository-1.0:${pkgs.pango}/lib/girepository-1.0:${pkgs.gdk-pixbuf}/lib/girepository-1.0:$GI_TYPELIB_PATH"
           export XDG_DATA_DIRS="${pkgs.gtk4}/share:${pkgs.libadwaita}/share:${pkgs.glib}/share:$XDG_DATA_DIRS"
           export XDG_DATA_DIRS=$XDG_DATA_DIRS:${hicolor-icon-theme}/share:${adwaita-icon-theme}/share
