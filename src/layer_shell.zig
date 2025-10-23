@@ -31,3 +31,14 @@ pub fn setAnchor(window: *gtk.ApplicationWindow, edge: c_int, anchor_to_edge: bo
 pub fn setExclusiveZone(window: *gtk.ApplicationWindow, exclusive_zone: c_int) void {
     gtk_layer_set_exclusive_zone(@ptrCast(window), exclusive_zone);
 }
+
+pub fn setupLayerShell(window: *gtk.ApplicationWindow) void {
+    initForWindow(window);
+    setLayer(window, GTK_LAYER_SHELL_EDGE_TOP);
+
+    setLayer(window, GTK_LAYER_SHELL_LAYER_TOP);
+    setAnchor(window, GTK_LAYER_SHELL_EDGE_TOP, true);
+    setAnchor(window, GTK_LAYER_SHELL_EDGE_LEFT, true);
+    setAnchor(window, GTK_LAYER_SHELL_EDGE_RIGHT, true);
+    setExclusiveZone(window, 30);
+}
