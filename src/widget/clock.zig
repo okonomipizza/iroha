@@ -52,7 +52,6 @@ pub const Clock = extern struct {
         gtk.StyleContext.addClass(clock_style_context, "clock-button");
 
         clock.private().timeout_id = glib.timeoutAdd(1000, &timerCallback, clock);
-
     }
 
     fn handleClicked(clock: *Clock, _: ?*anyopaque) callconv(.c) void {

@@ -173,7 +173,6 @@ pub const SystemMenu = extern struct {
             const power_menu: *Self = @ptrCast(@alignCast(m));
             const ctx = power_menu.private().ctx;
 
-
             power_menu.hidePopover();
 
             ctx.config.deinit();
@@ -182,7 +181,6 @@ pub const SystemMenu = extern struct {
                 return;
             };
 
-
             const loadCss = @import("../css.zig").loadCss;
             ctx.css_provider = loadCss(ctx.allocator(), ctx.config, ctx.css_provider) catch |err| {
                 std.debug.print("Failed to reload CSS: {}\n", .{err});
@@ -190,7 +188,7 @@ pub const SystemMenu = extern struct {
             };
 
             std.debug.print("Reloading configuration...\n", .{});
-            
+
             if (ctx.window) |w| {
                 std.debug.print("Window found, reloading layer shell settings...\n", .{});
 
@@ -203,9 +201,8 @@ pub const SystemMenu = extern struct {
 
                 std.debug.print("Successfully completed to reset layer?...\n", .{});
             } else {
-std.debug.print("Warning: ctx.window is null\n", .{});
+                std.debug.print("Warning: ctx.window is null\n", .{});
             }
-
         }
     }
 
@@ -245,7 +242,7 @@ std.debug.print("Warning: ctx.window is null\n", .{});
             .sleep => std.debug.print("Executing: Sleep\n", .{}),
             .restart => std.debug.print("Executing: Restart\n", .{}),
             .shutdown => std.debug.print("Executing: Shutdown\n", .{}),
-            else => return
+            else => return,
         }
 
         // Execute system commands
@@ -255,7 +252,7 @@ std.debug.print("Warning: ctx.window is null\n", .{});
             .sleep => "systemctl suspend",
             .restart => "systemctl reboot",
             .shutdown => "systemctl poweroff",
-            else => return
+            else => return,
         };
 
         // Execute command in background

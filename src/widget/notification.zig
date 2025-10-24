@@ -5,7 +5,6 @@ const gtk = @import("gtk");
 const gdk = @import("gdk");
 const pango = @import("pango");
 
-
 /// A node in a doubly linked list that stores a message string.
 const MessageNode = struct {
     message: [*:0]const u8,
@@ -180,7 +179,7 @@ pub const Notification = extern struct {
         widget_width: c_int, // Width of message widget
         // icon_width: c_int,
         text_width: c_int, // Width of the message label for display
-        // 
+        //
         arena: std.heap.ArenaAllocator,
 
         var offset: c_int = 0;

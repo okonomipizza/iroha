@@ -89,10 +89,7 @@ const MessageConfig = struct {
             }
 
             if (messages.object.get("default")) |default| {
-                return .{ 
-                    .text = text,
-                    .color = color,
-                    .messages = default };
+                return .{ .text = text, .color = color, .messages = default };
             }
         }
 
@@ -122,13 +119,13 @@ const ClockConfig = struct {
 
 const BarConfig = struct {
     exclusive_zone: c_int,
-    
+
     const Self = @This();
 
     fn init(config_json: std.json.Value) !Self {
         if (getWidgetConfig(config_json, "iroha")) |iroha| {
             if (iroha != .object) return error.InvalidConfig;
-            if (iroha.object.get("exclusive_zone")) |ez|{
+            if (iroha.object.get("exclusive_zone")) |ez| {
                 if (ez == .integer) {
                     const value = ez.integer;
                     if (value < std.math.minInt(c_int) or value > std.math.maxInt(c_int)) {
@@ -140,9 +137,7 @@ const BarConfig = struct {
                 }
             }
         }
-        return .{
-            .exclusive_zone = 30
-        };
+        return .{ .exclusive_zone = 30 };
     }
 };
 
