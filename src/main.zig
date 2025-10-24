@@ -14,16 +14,32 @@ const app_config = @import("config.zig");
 const Config = app_config.Config;
 const loadCss = @import("css.zig").loadCss;
 
+pub const AppContext = struct {
+    arena: *std.heap.ArenaAllocator,
+    config: *Config,
+    css_provider: ?*gtk.CssProvider = null,
+    window: ?*gtk.ApplicationWindow = null,
+    notification: ?*Notification = null,
+    music: ?*Music = null,
+    clock: ?*Clock = null,
+    system_menu: ?*SystemMenu = null,
+
+    pub fn allocator(self: *AppContext) std.mem.Allocator {
+        return self.arena.allocator();
+    }
+};
+
 fn activate(app: *gtk.Application, user_data: ?*anyopaque) callconv(.c) void {
     if (user_data) |data| {
-        const allocator = std.heap.page_allocator;
+        const ctx = @as(*AppContext, @ptrCast(@alignCast(data)));
+        // const allocator = std.heap.page_allocator;
 
-        const config = @as(*Config, @ptrCast(@alignCast(data)));
         var window = gtk.ApplicationWindow.new(app);
         gtk.Window.setTitle(window.as(gtk.Window), "System Bar");
         gtk.Window.setDefaultSize(window.as(gtk.Window), 200, 10);
 
-        loadCss(allocator, config) catch {
+        ctx.window = window;
+        ctx.css_provider = loadCss(ctx.allocator(), ctx.config, ctx.css_provider) catch {
             std.posix.exit(1);
         };
 
@@ -31,16 +47,16 @@ fn activate(app: *gtk.Application, user_data: ?*anyopaque) callconv(.c) void {
         gtk.StyleContext.addClass(style_context, "system-bar");
 
         // Make window style like system bar
-        layer_shell.setupLayerShell(window);
+        layer_shell.setupLayerShell(window, ctx.config);
 
         // Build window component
-        buildUI(window, config, allocator);
+        buildUI(window, ctx);
 
         gtk.Widget.show(window.as(gtk.Widget));
     }
 }
 
-fn buildUI(window: *gtk.ApplicationWindow, config: *Config, allocator: std.mem.Allocator) void {
+fn buildUI(window: *gtk.ApplicationWindow, ctx: *AppContext) void {
     var main_box = gtk.Box.new(gtk.Orientation.horizontal, 1);
     gtk.Widget.setHalign(main_box.as(gtk.Widget), gtk.Align.fill);
     gtk.Widget.setValign(main_box.as(gtk.Widget), gtk.Align.center);
@@ -58,17 +74,17 @@ fn buildUI(window: *gtk.ApplicationWindow, config: *Config, allocator: std.mem.A
     gtk.Widget.setValign(right_box.as(gtk.Widget), gtk.Align.center);
 
     // Create system menu component for controlling system and app
-    var menu = SystemMenu.new();
+    var menu = SystemMenu.new(ctx);
     // Create music player control component
-    var music = Music.new(allocator);
+    var music = Music.new(ctx.allocator());
     // Create animated message component
-    const messages = config.message_config.messages;
-    const msg_ptr = allocator.create(std.json.Value) catch {
+    const messages = ctx.config.message_config.messages;
+    const msg_ptr = ctx.allocator().create(std.json.Value) catch {
         std.debug.print("Failed to allocate memory for messages\n", .{});
         std.posix.exit(1);
     };
     msg_ptr.* = messages;
-    var norification = Notification.new(allocator, msg_ptr) catch {
+    var norification = Notification.new(ctx.allocator(), msg_ptr) catch {
         std.posix.exit(1);
     };
     // Create clock component (JST)
@@ -85,17 +101,23 @@ fn buildUI(window: *gtk.ApplicationWindow, config: *Config, allocator: std.mem.A
 }
 
 pub fn main() !void {
-    var allocator = std.heap.page_allocator;
-    const config = try Config.init(allocator);
+    // var allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+
+    const config_ptr = try arena.allocator().create(Config);
+    config_ptr.* = try Config.init(arena.allocator());
+
+    const ctx = try arena.allocator().create(AppContext);
+    ctx.* = .{
+        .arena = &arena,
+        .config = config_ptr,
+    };
 
     var app = gtk.Application.new("org.iroha.systembar", .{});
     defer app.unref();
 
-    const config_ptr = try allocator.create(Config);
-    config_ptr.* = config;
-
-    _ = gio.Application.signals.activate.connect(app, ?*anyopaque, &activate, @ptrCast(config_ptr), .{});
+    _ = gio.Application.signals.activate.connect(app, ?*anyopaque, &activate, @ptrCast(ctx), .{});
     const status = gio.Application.run(app.as(gio.Application), @intCast(std.os.argv.len), std.os.argv.ptr);
-
     std.process.exit(@intCast(status));
 }

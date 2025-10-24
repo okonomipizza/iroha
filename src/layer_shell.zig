@@ -1,5 +1,6 @@
 const std = @import("std");
 const gtk = @import("gtk");
+const Config = @import("config.zig").Config;
 
 extern "c" fn gtk_layer_init_for_window(window: *anyopaque) void;
 extern "c" fn gtk_layer_set_layer(window: *anyopaque, layer: c_int) void;
@@ -32,13 +33,13 @@ pub fn setExclusiveZone(window: *gtk.ApplicationWindow, exclusive_zone: c_int) v
     gtk_layer_set_exclusive_zone(@ptrCast(window), exclusive_zone);
 }
 
-pub fn setupLayerShell(window: *gtk.ApplicationWindow) void {
+pub fn setupLayerShell(window: *gtk.ApplicationWindow, config: *Config) void {
     initForWindow(window);
     setLayer(window, GTK_LAYER_SHELL_EDGE_TOP);
-
     setLayer(window, GTK_LAYER_SHELL_LAYER_TOP);
     setAnchor(window, GTK_LAYER_SHELL_EDGE_TOP, true);
     setAnchor(window, GTK_LAYER_SHELL_EDGE_LEFT, true);
     setAnchor(window, GTK_LAYER_SHELL_EDGE_RIGHT, true);
-    setExclusiveZone(window, 30);
+
+    setExclusiveZone(window, config.getExclusiveZone());
 }

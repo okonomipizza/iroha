@@ -5,6 +5,7 @@ const gtk = @import("gtk");
 const gdk = @import("gdk");
 const pango = @import("pango");
 
+
 /// A node in a doubly linked list that stores a message string.
 const MessageNode = struct {
     message: [*:0]const u8,

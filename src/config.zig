@@ -120,8 +120,35 @@ const ClockConfig = struct {
     }
 };
 
+const BarConfig = struct {
+    exclusive_zone: c_int,
+    
+    const Self = @This();
+
+    fn init(config_json: std.json.Value) !Self {
+        if (getWidgetConfig(config_json, "iroha")) |iroha| {
+            if (iroha != .object) return error.InvalidConfig;
+            if (iroha.object.get("exclusive_zone")) |ez|{
+                if (ez == .integer) {
+                    const value = ez.integer;
+                    if (value < std.math.minInt(c_int) or value > std.math.maxInt(c_int)) {
+                        return error.ValueOutOfRange;
+                    }
+                    return .{
+                        .exclusive_zone = @intCast(value),
+                    };
+                }
+            }
+        }
+        return .{
+            .exclusive_zone = 30
+        };
+    }
+};
+
 // App config
 pub const Config = struct {
+    bar_config: BarConfig,
     system_config: SystemConfig,
     music_config: MusicConfig,
     message_config: MessageConfig,
@@ -176,12 +203,14 @@ pub const Config = struct {
         const config_json = try jsonc_parser.parse();
         if (config_json != .object) return error.InvalidConfig;
 
+        const bar_config = try BarConfig.init(config_json);
         const system_config = try SystemConfig.init(config_json);
         const music_config = try MusicConfig.init(config_json);
         const messages_config = try MessageConfig.init(config_json);
         const clock_config = try ClockConfig.init(config_json);
 
         return .{
+            .bar_config = bar_config,
             .system_config = system_config,
             .music_config = music_config,
             .message_config = messages_config,
@@ -192,6 +221,10 @@ pub const Config = struct {
 
     pub fn deinit(self: *Self) void {
         self.parser.deinit();
+    }
+
+    pub fn getExclusiveZone(self: Self) c_int {
+        return self.bar_config.exclusive_zone;
     }
 };
 

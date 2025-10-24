@@ -3,21 +3,27 @@ const app_config = @import("config.zig");
 const Config = app_config.Config;
 const gtk = @import("gtk");
 const gdk = @import("gdk");
+const AppContext = @import("main.zig").AppContext;
 
-pub fn loadCss(allocator: std.mem.Allocator, config: *const Config) anyerror!void {
-    const provider = gtk.CssProvider.new();
+pub fn loadCss(allocator: std.mem.Allocator, config: *const Config, provider: ?*gtk.CssProvider) anyerror!*gtk.CssProvider {
+    const css_provider = provider orelse gtk.CssProvider.new();
+
     const css_data = try generateCssFromConfig(allocator, config);
     defer allocator.free(css_data);
     const css_data_z = try allocator.dupeZ(u8, css_data);
     defer allocator.free(css_data_z);
 
-    gtk.CssProvider.loadFromData(provider, css_data_z.ptr, @intCast(css_data_z.len));
+    gtk.CssProvider.loadFromData(css_provider, css_data_z.ptr, @intCast(css_data_z.len));
 
     const display = gdk.Display.getDefault() orelse {
         return error.FailedToGetDisplay;
     };
 
-    gtk.StyleContext.addProviderForDisplay(display, provider.as(gtk.StyleProvider), gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
+    if (provider == null) {
+        gtk.StyleContext.addProviderForDisplay(display, css_provider.as(gtk.StyleProvider), gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
+    }
+
+    return css_provider;
 }
 
 fn generateCssVariables(allocator: std.mem.Allocator, config: *const Config) ![]const u8 {

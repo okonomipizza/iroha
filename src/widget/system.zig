@@ -4,8 +4,12 @@ const gobject = @import("gobject");
 const gtk = @import("gtk");
 const gdk = @import("gdk");
 const gdkpixbuf = @import("gdkpixbuf");
+const AppContext = @import("../main.zig").AppContext;
+const Config = @import("../config.zig").Config;
+const layer_shell = @import("../layer_shell.zig");
 
 const Action = enum {
+    reload_config,
     sleep,
     restart,
     shutdown,
@@ -22,6 +26,7 @@ pub const SystemMenu = extern struct {
     const Private = struct {
         menu_icon: ?*gtk.Image,
         popover: ?*gtk.Popover,
+        ctx: *AppContext,
 
         var offset: c_int = 0;
     };
@@ -34,8 +39,9 @@ pub const SystemMenu = extern struct {
         .private = .{ .Type = Private, .offset = &Private.offset },
     });
 
-    pub fn new() *Self {
+    pub fn new(ctx: *AppContext) *Self {
         var menu = gobject.ext.newInstance(Self, .{});
+        menu.private().ctx = ctx;
         const menu_style_context = gtk.Widget.getStyleContext(menu.as(gtk.Widget));
         gtk.StyleContext.addClass(menu_style_context, "system-button");
         return menu;
@@ -99,9 +105,10 @@ pub const SystemMenu = extern struct {
         gtk.StyleContext.addClass(box_style_context, "system-menu-box");
 
         // Create menu items
-        menu.createMenuItem(box, "sleep", Action.sleep);
-        menu.createMenuItem(box, "restart", Action.restart);
-        menu.createMenuItem(box, "shutdown", Action.shutdown);
+        menu.createMenuItem(box, "Reload Configuration", Action.reload_config);
+        menu.createMenuItem(box, "Sleep", Action.sleep);
+        menu.createMenuItem(box, "Restart", Action.restart);
+        menu.createMenuItem(box, "Shutdown", Action.shutdown);
     }
 
     fn onPopoverShow(_: *gtk.Popover, menu: ?*anyopaque) callconv(.c) void {
@@ -146,6 +153,7 @@ pub const SystemMenu = extern struct {
 
         // Connect button signal with action data
         switch (action) {
+            .reload_config => _ = gtk.Button.signals.clicked.connect(button, ?*anyopaque, &reloadConfig, menu, .{}),
             .sleep => _ = gtk.Button.signals.clicked.connect(button, ?*anyopaque, &handleSleep, menu, .{}),
             .restart => _ = gtk.Button.signals.clicked.connect(button, ?*anyopaque, &handleRestart, menu, .{}),
             .shutdown => _ = gtk.Button.signals.clicked.connect(button, ?*anyopaque, &handleShutdown, menu, .{}),
@@ -157,6 +165,47 @@ pub const SystemMenu = extern struct {
     fn handleClicked(menu: *Self, _: ?*anyopaque) callconv(.c) void {
         if (menu.private().popover) |popover| {
             gtk.Popover.popup(popover);
+        }
+    }
+
+    pub fn reloadConfig(_: *gtk.Button, menu: ?*anyopaque) callconv(.c) void {
+        if (menu) |m| {
+            const power_menu: *Self = @ptrCast(@alignCast(m));
+            const ctx = power_menu.private().ctx;
+
+
+            power_menu.hidePopover();
+
+            ctx.config.deinit();
+            ctx.config.* = Config.init(ctx.allocator()) catch {
+                std.debug.print("Failed to load config\n", .{});
+                return;
+            };
+
+
+            const loadCss = @import("../css.zig").loadCss;
+            ctx.css_provider = loadCss(ctx.allocator(), ctx.config, ctx.css_provider) catch |err| {
+                std.debug.print("Failed to reload CSS: {}\n", .{err});
+                return;
+            };
+
+            std.debug.print("Reloading configuration...\n", .{});
+            
+            if (ctx.window) |w| {
+                std.debug.print("Window found, reloading layer shell settings...\n", .{});
+
+                gtk.Widget.unmap(w.as(gtk.Widget));
+
+                layer_shell.setupLayerShell(w, ctx.config);
+
+                gtk.Widget.map(w.as(gtk.Widget));
+                gtk.Widget.show(w.as(gtk.Widget));
+
+                std.debug.print("Successfully completed to reset layer?...\n", .{});
+            } else {
+std.debug.print("Warning: ctx.window is null\n", .{});
+            }
+
         }
     }
 
@@ -196,6 +245,7 @@ pub const SystemMenu = extern struct {
             .sleep => std.debug.print("Executing: Sleep\n", .{}),
             .restart => std.debug.print("Executing: Restart\n", .{}),
             .shutdown => std.debug.print("Executing: Shutdown\n", .{}),
+            else => return
         }
 
         // Execute system commands
@@ -205,6 +255,7 @@ pub const SystemMenu = extern struct {
             .sleep => "systemctl suspend",
             .restart => "systemctl reboot",
             .shutdown => "systemctl poweroff",
+            else => return
         };
 
         // Execute command in background
