@@ -13,6 +13,7 @@ const jsonc = @import("zig_jsonc");
 const app_config = @import("config.zig");
 const Config = app_config.Config;
 const loadCss = @import("css.zig").loadCss;
+const notification_daemon = @import("daemon.zig");
 
 pub const AppContext = struct {
     arena: *std.heap.ArenaAllocator,
@@ -32,7 +33,6 @@ pub const AppContext = struct {
 fn activate(app: *gtk.Application, user_data: ?*anyopaque) callconv(.c) void {
     if (user_data) |data| {
         const ctx = @as(*AppContext, @ptrCast(@alignCast(data)));
-        // const allocator = std.heap.page_allocator;
 
         var window = gtk.ApplicationWindow.new(app);
         gtk.Window.setTitle(window.as(gtk.Window), "System Bar");
@@ -113,6 +113,9 @@ pub fn main() !void {
         .arena = &arena,
         .config = config_ptr,
     };
+
+    const owner_id = notification_daemon.startNotificationDaemon();
+    std.debug.print("通知デーモン owner_id: {}\n", .{owner_id});
 
     var app = gtk.Application.new("org.iroha.systembar", .{});
     defer app.unref();
