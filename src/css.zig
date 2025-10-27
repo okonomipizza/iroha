@@ -3,21 +3,27 @@ const app_config = @import("config.zig");
 const Config = app_config.Config;
 const gtk = @import("gtk");
 const gdk = @import("gdk");
+const AppContext = @import("main.zig").AppContext;
 
-pub fn loadCss(allocator: std.mem.Allocator, config: *const Config) anyerror!void {
-    const provider = gtk.CssProvider.new();
+pub fn loadCss(allocator: std.mem.Allocator, config: *const Config, provider: ?*gtk.CssProvider) anyerror!*gtk.CssProvider {
+    const css_provider = provider orelse gtk.CssProvider.new();
+
     const css_data = try generateCssFromConfig(allocator, config);
     defer allocator.free(css_data);
     const css_data_z = try allocator.dupeZ(u8, css_data);
     defer allocator.free(css_data_z);
 
-    gtk.CssProvider.loadFromData(provider, css_data_z.ptr, @intCast(css_data_z.len));
+    gtk.CssProvider.loadFromData(css_provider, css_data_z.ptr, @intCast(css_data_z.len));
 
     const display = gdk.Display.getDefault() orelse {
         return error.FailedToGetDisplay;
     };
 
-    gtk.StyleContext.addProviderForDisplay(display, provider.as(gtk.StyleProvider), gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
+    if (provider == null) {
+        gtk.StyleContext.addProviderForDisplay(display, css_provider.as(gtk.StyleProvider), gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
+    }
+
+    return css_provider;
 }
 
 fn generateCssVariables(allocator: std.mem.Allocator, config: *const Config) ![]const u8 {
@@ -175,12 +181,12 @@ fn generateSystemCss(allocator: std.mem.Allocator, config: *const Config) ![]con
     , .{});
     return css;
 }
+
 fn generateMusicCss(allocator: std.mem.Allocator, config: *const Config) ![]const u8 {
-    _ = config;
     const css = try std.fmt.allocPrint(allocator,
         \\.music {{
         \\    color: var(--color-white);
-        \\    font-size: 12px;
+        \\    font-size: {d}px;
         \\    min-height: 20px;
         \\    max-height: 20px;
         \\    margin: 2px 6px;
@@ -219,16 +225,15 @@ fn generateMusicCss(allocator: std.mem.Allocator, config: *const Config) ![]cons
         \\    min-height: 16px;
         \\    -gtk-icon-size: 16px;
         \\}}
-    , .{});
+    , .{config.music_config.font_size});
     return css;
 }
 
 fn generateNotificationCss(allocator: std.mem.Allocator, config: *const Config) ![]const u8 {
-    _ = config;
     const css = try std.fmt.allocPrint(allocator,
         \\.notification {{
         \\    color: var(--color-white);
-        \\    font-size: 12px;
+        \\    font-size: {d}px;
         \\    min-height: 20px;
         \\    max-height: 20px;
         \\    margin: 2px 6px;
@@ -236,12 +241,11 @@ fn generateNotificationCss(allocator: std.mem.Allocator, config: *const Config) 
         \\    border: 1px solid var(--color-notification);
         \\    border-radius: var(--border-radius-large);
         \\}}
-    , .{});
+    , .{config.message_config.font_size});
     return css;
 }
 
 fn generateClockCss(allocator: std.mem.Allocator, config: *const Config) ![]const u8 {
-    _ = config;
     const css = try std.fmt.allocPrint(allocator,
         \\
         \\.clock,
@@ -249,7 +253,7 @@ fn generateClockCss(allocator: std.mem.Allocator, config: *const Config) ![]cons
         \\button.clock,
         \\button.clock-button {{
         \\    color: var(--color-white);
-        \\    font-size: 12px;
+        \\    font-size: {d}px;
         \\    font-family: monospace;
         \\    background: var(--color-transparent);
         \\    padding: 4px 8px;
@@ -263,7 +267,7 @@ fn generateClockCss(allocator: std.mem.Allocator, config: *const Config) ![]cons
         \\    color: var(--color-clock);
         \\}}
         \\
-    , .{});
+    , .{config.clock_config.font_size});
     return css;
 }
 

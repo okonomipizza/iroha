@@ -1,6 +1,9 @@
 const std = @import("std");
 const jsonc = @import("zig_jsonc");
 
+const DEFASULT_EXCLUSIVE_ZONE = 30;
+const DEFAULT_FONT_SIZE = 12;
+
 fn getWidgetConfig(root: std.json.Value, widget_name: []const u8) ?std.json.Value {
     if (root != .object) return null;
     if (root.object.get(widget_name)) |widget_config| {
@@ -14,6 +17,13 @@ fn getWidgetThemeObj(root: std.json.Value, widget_name: []const u8) ?std.json.Va
     const widget_root = getWidgetConfig(root, widget_name) orelse return null;
     const widget_theme = widget_root.object.get("theme") orelse return null;
     if (widget_theme == .object) return widget_theme;
+    return null;
+}
+
+fn getWidgetFontSize(root: std.json.Value, widget_name: []const u8) ?u8 {
+    const widget_root = getWidgetConfig(root, widget_name) orelse return null;
+    const font_size = widget_root.object.get("font-size") orelse return null;
+    if (font_size == .integer) return @intCast(font_size.integer);
     return null;
 }
 
@@ -37,9 +47,11 @@ const SystemConfig = struct {
         };
     }
 };
+
 const MusicConfig = struct {
     text: []const u8,
     color: []const u8,
+    font_size: u8,
 
     const Self = @This();
 
@@ -47,6 +59,17 @@ const MusicConfig = struct {
         // default: dark violet
         var text: []const u8 = "rgb(255, 255, 255)";
         var color: []const u8 = "rgb(148, 0, 211)";
+        // const font_size: u8 = getWidgetFontSize(config_json, "music") orelse DEFAULT_FONT_SIZE;
+        const font_size: u8 = blk: {
+            if (getWidgetFontSize(config_json, "music")) |music_fs| {
+                break :blk music_fs;
+            } else {
+                if (getWidgetFontSize(config_json, "iroha")) |bar_fs| {
+                    break :blk bar_fs;
+                }
+                break :blk DEFAULT_FONT_SIZE;
+            }
+        };
 
         if (getWidgetThemeObj(config_json, "music")) |music_theme| {
             if (music_theme.object.get("text")) |txt| {
@@ -56,10 +79,7 @@ const MusicConfig = struct {
                 color = bc.string;
             }
         }
-        return .{
-            .text = text,
-            .color = color,
-        };
+        return .{ .text = text, .color = color, .font_size = font_size };
     }
 };
 
@@ -68,12 +88,14 @@ const MessageConfig = struct {
     messages: std.json.Value,
     text: []const u8,
     color: []const u8,
+    font_size: u8,
 
     const Self = @This();
 
     fn init(config_json: std.json.Value) !Self {
         var text: []const u8 = "rgb(255, 255, 255)";
         var color: []const u8 = "rgb(255, 95, 0)";
+        const font_size: u8 = getWidgetFontSize(config_json, "messages") orelse DEFAULT_FONT_SIZE;
 
         if (getWidgetThemeObj(config_json, "messages")) |messages_theme| {
             if (messages_theme.object.get("text")) |txt| {
@@ -89,10 +111,7 @@ const MessageConfig = struct {
             }
 
             if (messages.object.get("default")) |default| {
-                return .{ 
-                    .text = text,
-                    .color = color,
-                    .messages = default };
+                return .{ .text = text, .color = color, .messages = default, .font_size = font_size };
             }
         }
 
@@ -101,6 +120,7 @@ const MessageConfig = struct {
 };
 
 const ClockConfig = struct {
+    font_size: u8,
     color: []const u8,
 
     const Self = @This();
@@ -114,14 +134,49 @@ const ClockConfig = struct {
                 color = c.string;
             }
         }
+
+        const font_size: u8 = getWidgetFontSize(config_json, "clock") orelse DEFAULT_FONT_SIZE;
         return .{
+            .font_size = font_size,
             .color = color,
         };
     }
 };
 
+const BarConfig = struct {
+    exclusive_zone: c_int,
+    font_size: u8,
+
+    const Self = @This();
+
+    fn init(config_json: std.json.Value) !Self {
+        var exclusive_zone: c_int = DEFASULT_EXCLUSIVE_ZONE;
+        var font_size: u8 = DEFAULT_FONT_SIZE;
+
+        if (getWidgetConfig(config_json, "iroha")) |iroha| {
+            if (iroha != .object) return error.InvalidConfig;
+            if (iroha.object.get("exclusive_zone")) |ez| {
+                if (ez == .integer) {
+                    const value = ez.integer;
+                    if (value < std.math.minInt(c_int) or value > std.math.maxInt(c_int)) {
+                        return error.ValueOutOfRange;
+                    }
+                    exclusive_zone = @intCast(value);
+                }
+            }
+            if (iroha.object.get("font-size")) |size| {
+                if (size == .integer) {
+                    font_size = @intCast(size.integer);
+                }
+            }
+        }
+        return .{ .exclusive_zone = exclusive_zone, .font_size = font_size };
+    }
+};
+
 // App config
 pub const Config = struct {
+    bar_config: BarConfig,
     system_config: SystemConfig,
     music_config: MusicConfig,
     message_config: MessageConfig,
@@ -176,12 +231,14 @@ pub const Config = struct {
         const config_json = try jsonc_parser.parse();
         if (config_json != .object) return error.InvalidConfig;
 
+        const bar_config = try BarConfig.init(config_json);
         const system_config = try SystemConfig.init(config_json);
         const music_config = try MusicConfig.init(config_json);
         const messages_config = try MessageConfig.init(config_json);
         const clock_config = try ClockConfig.init(config_json);
 
         return .{
+            .bar_config = bar_config,
             .system_config = system_config,
             .music_config = music_config,
             .message_config = messages_config,
@@ -192,6 +249,10 @@ pub const Config = struct {
 
     pub fn deinit(self: *Self) void {
         self.parser.deinit();
+    }
+
+    pub fn getExclusiveZone(self: Self) c_int {
+        return self.bar_config.exclusive_zone;
     }
 };
 

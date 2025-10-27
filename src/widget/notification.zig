@@ -31,7 +31,6 @@ const MessageNode = struct {
 
     /// Frees the memory used by this node, including its message.
     pub fn destroy(self: *Self, allocator: std.mem.Allocator) void {
-        // allocator.free(self.message);
         allocator.free(std.mem.span(self.message));
         allocator.destroy(self);
     }
@@ -60,6 +59,9 @@ const MessageManager = struct {
     /// Creates a new MessageManager with the specified maximum message capacity.
     ///
     /// Caller must call `deinit()` when done to free all resources.
+    /// The allcoator should typically be an ArenaAllocator.allocator() for automatic cleanup.
+    /// When using ArenaAllocator, calling `deinit()` is optional as all memory will be
+    /// freed when the parent arena is deinitialized.
     pub fn init(allocator: std.mem.Allocator, max_count: usize) !*Self {
         const manager = try allocator.create(Self);
         manager.* = .{
@@ -140,9 +142,13 @@ const MessageManager = struct {
         self.count = 0;
     }
 
+    /// Deinitializes the MessageManager.
+    ///
+    /// This is a no-op when using ArenaAllocator, as all memory is freed when the parent
+    /// arena is deinitialized. This method exists for API consistency and to avoid confusion
+    /// for users expecting a deinit() counterpart to init().
     pub fn deinit(self: *Self) void {
-        self.clear();
-        self.allocator.destroy(self);
+        _ = self;
     }
 };
 
@@ -173,7 +179,9 @@ pub const Notification = extern struct {
         widget_width: c_int, // Width of message widget
         // icon_width: c_int,
         text_width: c_int, // Width of the message label for display
-        allocator: ?std.mem.Allocator,
+        //
+        arena: std.heap.ArenaAllocator,
+
         var offset: c_int = 0;
     };
 
@@ -188,13 +196,21 @@ pub const Notification = extern struct {
     });
 
     /// Returns initialized instance
-    pub fn new(allocator: std.mem.Allocator, config: ?*std.json.Value) !*Notification {
+    pub fn new(child_allocator: std.mem.Allocator, config: ?*std.json.Value) !*Notification {
         var notification = gobject.ext.newInstance(Notification, .{});
+
+        // Add CSS class
         const notification_style_context = gtk.Widget.getStyleContext(notification.as(gtk.Widget));
         gtk.StyleContext.addClass(notification_style_context, "notification");
 
+        // Reference to rivate fields
         var priv = notification.private();
+
+        priv.arena = std.heap.ArenaAllocator.init(child_allocator);
+        const allocator = priv.arena.allocator();
+
         priv.manager = try MessageManager.init(allocator, 10);
+
         if (priv.manager) |manager| {
             if (config) |cfg| {
                 if (cfg.* == .array) {
@@ -226,8 +242,6 @@ pub const Notification = extern struct {
         gtk.Widget.getPreferredSize(priv.label.as(gtk.Widget), null, &req);
         priv.text_width = req.f_width;
 
-        priv.allocator = allocator;
-
         const available_width = notification.availableWidth();
         priv.scroll_position = @as(f64, @floatFromInt(available_width));
 
@@ -252,11 +266,6 @@ pub const Notification = extern struct {
     }
 
     fn initializeWithAllocator(notification: *Notification) void {
-        const priv = notification.private();
-        if (priv.allocator == null) {
-            std.debug.print("Warning: allocator not set\n", .{});
-            return;
-        }
         startAnimation(notification);
     }
 
@@ -269,7 +278,7 @@ pub const Notification = extern struct {
         priv.frame_count = 0;
         priv.widget_width = 300;
         priv.text_width = 0;
-        priv.allocator = null;
+        priv.arena = undefined;
 
         priv.main_hbox = gtk.Box.new(gtk.Orientation.horizontal, 0);
         gtk.Widget.setMarginStart(priv.main_hbox.as(gtk.Widget), PADDING_HORIZONTAL);
@@ -379,10 +388,8 @@ pub const Notification = extern struct {
             priv.scroll_tick_id = 0;
         }
 
-        if (priv.manager) |manager| {
-            manager.deinit();
-            priv.manager = null;
-        }
+        priv.arena.deinit();
+        priv.manager = null;
 
         gobject.Object.virtual_methods.dispose.call(Class.parent, music.as(Parent));
     }

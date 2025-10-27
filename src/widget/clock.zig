@@ -47,6 +47,10 @@ pub const Clock = extern struct {
         _ = gtk.Button.signals.clicked.connect(clock, ?*anyopaque, &handleClicked, null, .{});
         clock.updateLabel();
 
+        const clock_style_context = gtk.Widget.getStyleContext(clock.as(gtk.Widget));
+        gtk.StyleContext.addClass(clock_style_context, "clock");
+        gtk.StyleContext.addClass(clock_style_context, "clock-button");
+
         clock.private().timeout_id = glib.timeoutAdd(1000, &timerCallback, clock);
     }
 
