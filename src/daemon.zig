@@ -1,12 +1,14 @@
 const std = @import("std");
 const gio = @import("gio");
 const glib = @import("glib");
+const NotificationState = @import("./widget/notification.zig").NotificationState;
+const NotificationData = @import("./widget/notification.zig").NotificationData;
+const NotificationType = @import("./widget/notification.zig").NotificationType;
 
-const NOTIFICATIONS_INTERFACE = "org.freedesktop.Notifications";
-const NOTIFICATIONS_PATH = "/org/freedesktop/Notifications";
-
+const notifications_interface = "org.freedesktop.Notifications";
+const notifications_path = "/org/freedesktop/Notifications";
 const introspection_xml =
-    \\<?xml version="1.0" encoding="UTF-8"?>
+    \\<?xml version="1.0" encoding="utf-8"?>
     \\<node>
     \\  <interface name='org.freedesktop.Notifications'>
     \\    <method name='Notify'>
@@ -60,7 +62,6 @@ fn handleMethodCall(
     _ = sender;
     _ = object_path;
     _ = interface_name;
-    _ = user_data;
 
     const method_name_slice = std.mem.span(method_name);
 
@@ -87,7 +88,13 @@ fn handleMethodCall(
             &expire_timeout,
         );
 
-        std.debug.print("\n=== Received notification ===\n", .{});
+        const id = if (replaces_id != 0) replaces_id else blk: {
+            const new_id = notification_id_counter;
+            notification_id_counter += 1;
+            break :blk new_id;
+        };
+
+        std.debug.print("\n=== received notification ===\n", .{});
         std.debug.print("from: {s}\n", .{app_name});
         std.debug.print("icon: {s}\n", .{app_icon});
         std.debug.print("title: {s}\n", .{summary});
@@ -95,15 +102,15 @@ fn handleMethodCall(
         std.debug.print("timeout: {}ms\n", .{expire_timeout});
         std.debug.print("===============\n\n", .{});
 
+        if (user_data) |data| {
+            const state = @as(*NotificationState, @ptrCast(@alignCast(data)));
+            state.addNotification(std.mem.span(app_name), std.mem.span(summary), id) catch |err| {
+                std.debug.print("Failed to add notification: {}\n", .{err});
+            };
+        }
+
         actions.unref();
         hints.unref();
-
-        // IDを返す
-        const id = if (replaces_id != 0) replaces_id else blk: {
-            const new_id = notification_id_counter;
-            notification_id_counter += 1;
-            break :blk new_id;
-        };
 
         const id_c: c_uint = @intCast(id);
         const return_value = glib.Variant.new("(u)", id_c);
@@ -136,7 +143,7 @@ fn handleMethodCall(
         var id: u32 = undefined;
         _ = glib.Variant.get(parameters, "(u)", &id);
 
-        std.debug.print("Close #{}\n", .{id});
+        std.debug.print("close #{}\n", .{id});
 
         gio.DBusMethodInvocation.returnValue(invocation, null);
     }
@@ -152,7 +159,6 @@ fn onBusAcquired(
     user_data: ?*anyopaque,
 ) callconv(.c) void {
     _ = name;
-    _ = user_data;
 
     var err: ?*glib.Error = null;
     const introspection_data = gio.DBusNodeInfo.newForXml(introspection_xml, &err);
@@ -162,6 +168,7 @@ fn onBusAcquired(
         }
         return;
     }
+
     defer introspection_data.?.unref();
 
     const vtable = gio.DBusInterfaceVTable{
@@ -172,29 +179,28 @@ fn onBusAcquired(
     };
 
     const interfaces = introspection_data.?.f_interfaces orelse {
-        std.debug.print("No interface found\n", .{});
+        std.debug.print("no interface found\n", .{});
         return;
     };
 
     const first_interface = interfaces[0];
-
     const registration_id = gio.DBusConnection.registerObject(
         connection,
-        NOTIFICATIONS_PATH,
+        notifications_path,
         first_interface,
         &vtable,
-        null,
+        user_data,
         dummyDestroyNotify,
         &err,
     );
 
     if (err) |e| {
-        std.debug.print("Error of object registration: {s}\n", .{e.f_message.?});
+        std.debug.print("error of object registration: {s}\n", .{e.f_message.?});
         return;
     }
 
     if (registration_id > 0) {
-        std.debug.print("Notification daemon started: registration_id={}\n", .{registration_id});
+        std.debug.print("notification daemon started: registration_id={}\n", .{registration_id});
     }
 }
 
@@ -205,7 +211,7 @@ fn onNameAcquired(
 ) callconv(.c) void {
     _ = connection;
     _ = user_data;
-    std.debug.print("D-Bus name: {s}\n", .{name});
+    std.debug.print("d-bus name: {s}\n", .{name});
 }
 
 fn onNameLost(
@@ -215,10 +221,10 @@ fn onNameLost(
 ) callconv(.c) void {
     _ = connection;
     _ = user_data;
-    std.debug.print("Failed to get D-Bus name: {s}\n", .{name});
-    std.debug.print("Other daemon seem to be activated\n", .{});
+    std.debug.print("failed to get d-bus name: {s}\n", .{name});
+    std.debug.print("other daemon seem to be activated\n", .{});
 }
 
-pub fn startNotificationDaemon() u32 {
-    return gio.busOwnName(.session, NOTIFICATIONS_INTERFACE, .{}, onBusAcquired, onNameAcquired, onNameLost, null, null);
+pub fn startNotificationDaemon(notification_state: *NotificationState) u32 {
+    return gio.busOwnName(.session, notifications_interface, .{}, onBusAcquired, onNameAcquired, onNameLost, notification_state, null);
 }
