@@ -1,7 +1,7 @@
 const std = @import("std");
 
 /// This parser can parse .desktop file
-const DotDesktopParser = struct {
+pub const DotDesktopParser = struct {
     input: []const u8,
     map: *std.StringHashMap([]const u8),
 

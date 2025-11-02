@@ -83,6 +83,40 @@ const MusicConfig = struct {
     }
 };
 
+const LauncherConfig = struct {
+    text: []const u8,
+    color: []const u8,
+    font_size: u8,
+
+    const Self = @This();
+
+    fn init(config_json: std.json.Value) !Self {
+        // default: dark violet
+        var text: []const u8 = "rgb(255, 255, 255)";
+        var color: []const u8 = "rgb(255, 255, 0)";
+        const font_size: u8 = blk: {
+            if (getWidgetFontSize(config_json, "launcher")) |launcher_fs| {
+                break :blk launcher_fs;
+            } else {
+                if (getWidgetFontSize(config_json, "iroha")) |bar_fs| {
+                    break :blk bar_fs;
+                }
+                break :blk DEFAULT_FONT_SIZE;
+            }
+        };
+
+        if (getWidgetThemeObj(config_json, "launcher")) |theme| {
+            if (theme.object.get("text")) |txt| {
+                text = txt.string;
+            }
+            if (theme.object.get("color")) |bc| {
+                color = bc.string;
+            }
+        }
+        return .{ .text = text, .color = color, .font_size = font_size };
+    }
+};
+
 const MessageConfig = struct {
     // This value must to be an array of string
     messages: std.json.Value,
@@ -178,6 +212,7 @@ const BarConfig = struct {
 pub const Config = struct {
     bar_config: BarConfig,
     system_config: SystemConfig,
+    launcher_config: LauncherConfig,
     music_config: MusicConfig,
     message_config: MessageConfig,
     clock_config: ClockConfig,
@@ -233,6 +268,7 @@ pub const Config = struct {
 
         const bar_config = try BarConfig.init(config_json);
         const system_config = try SystemConfig.init(config_json);
+        const launcher_config = try LauncherConfig.init(config_json);
         const music_config = try MusicConfig.init(config_json);
         const messages_config = try MessageConfig.init(config_json);
         const clock_config = try ClockConfig.init(config_json);
@@ -240,6 +276,7 @@ pub const Config = struct {
         return .{
             .bar_config = bar_config,
             .system_config = system_config,
+            .launcher_config = launcher_config,
             .music_config = music_config,
             .message_config = messages_config,
             .clock_config = clock_config,
