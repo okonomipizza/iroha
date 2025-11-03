@@ -255,6 +255,25 @@ fn generateLauncherCss(allocator: std.mem.Allocator, config: *const Config) ![]c
         \\    background-color: var(--color-black-light);
         \\    border: 1px solid var(--color-launcher);
         \\    border-radius: var(--border-radius-large);
+        \\    overflow: hidden;
+        \\}}
+        \\
+        \\.launcher scrollbar.horizontal {{
+        \\    min-height: 1px;
+        \\    max-height: 1px;
+        \\    background: transparent;
+        \\    border: none;
+        \\}}
+        \\
+        \\.launcher scrollbar.horizontal slider {{
+        \\    min-height: 1px;
+        \\    border-radius: 1px;
+        \\    background-color: var(--color-launcher);
+        \\    margin-left: 30%;
+        \\}}
+        \\
+        \\.launcher scrollbar.horizontal:hover slider {{
+        \\    background-color: var(--color-launcher);
         \\}}
         \\
         \\.launcher-app-icon {{

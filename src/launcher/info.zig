@@ -55,12 +55,14 @@ pub const AppEntry = struct {
 
             if (result == 0) {
                 if (error_ptr) |err| {
-                    std.debug.print("Failed to launch app: {s}\n", .{err.f_message});
+                    // const message = std.mem.span(err.f_message);
+                    // std.debug.print("Failed to launch app: {s}\n", .{message});
                     glib.Error.free(err);
                 }
             } else {
-                const app_name = app_info.getName();
-                std.debug.print("Launched app: {s}\n", .{app_name});
+                // const app_name = app_info.getName();
+                // const name = std.mem.span(app_name);
+                // std.debug.print("Launched app: {s}\n", .{name});
             }
         }
     }
