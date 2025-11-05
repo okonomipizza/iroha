@@ -3,6 +3,7 @@ const glib = @import("glib");
 const gobject = @import("gobject");
 const gtk = @import("gtk");
 const AppLauncheDataManager = @import("data.zig").AppLaunchManager;
+const AppEntry = @import("info.zig").AppEntry;
 
 const info = @import("./info.zig");
 
@@ -36,28 +37,13 @@ pub const Launcher = extern struct {
         const style_context = gtk.Widget.getStyleContext(launcher.as(gtk.Widget));
         gtk.StyleContext.addClass(style_context, "launcher");
 
-        const apps = try info.getAllApplications(allocator);
+        var apps = try info.getAllApplications(allocator);
         priv.apps = apps;
         priv.allocator = allocator;
         const data_manager = try AppLauncheDataManager.init(allocator);
 
         if (priv.app_box) |app_box| {
-            // sort app order
-            var i: usize = 0;
-            while (i < data_manager.length()) : (i += 1) {
-                const target = data_manager.stats.items[i].app_name;
-                var t = i;
-                while (t < apps.items.len) : (t += 1) {
-                    const current = std.mem.span(apps.items[t].name);
-                    if (std.mem.eql(u8, target, current)) {
-                        if (t == i) break;
-                        const temp = apps.items[i];
-                        apps.items[i] = apps.items[t];
-                        apps.items[t] = temp;
-                        break;
-                    }
-                }
-            }
+            sortAppOrder(data_manager, &apps);
             // Add app launch buttons
             for (apps.items) |*app| {
                 const widget = app.createWidget();
@@ -66,6 +52,37 @@ pub const Launcher = extern struct {
         }
 
         return launcher;
+    }
+
+    /// Sorts the app list based on launch frequency
+    ///
+    /// Reorders the app list according to the launch statistics stored in data_manager.
+    /// App that have been launched more recently or frequently appear first in the sorted list.
+    /// The order in data_manager.stats determines the priority, and the apps list is rearranged
+    /// to match that order.
+    ///
+    /// Parameters:
+    ///   - data_manager: Manager containing app launch statistics
+    ///   - apps: List ot app entries to be sorted (modified in place)
+    ///
+    /// Note:
+    ///   - Apps not present in data_manager remain at the end of the list
+    fn sortAppOrder(data_manager: *AppLauncheDataManager, apps: *std.ArrayList(AppEntry)) void {
+        var i: usize = 0;
+        while (i < data_manager.length()) : (i += 1) {
+            const target = data_manager.stats.items[i].app_name;
+            var t = i;
+            while (t < apps.items.len) : (t += 1) {
+                const current = std.mem.span(apps.items[t].name);
+                if (std.mem.eql(u8, target, current)) {
+                    if (t == i) break;
+                    const temp = apps.items[i];
+                    apps.items[i] = apps.items[t];
+                    apps.items[t] = temp;
+                    break;
+                }
+            }
+        }
     }
 
     pub fn as(clock: *Self, comptime T: type) *T {
@@ -77,7 +94,7 @@ pub const Launcher = extern struct {
 
         const scrolled = gtk.ScrolledWindow.new();
         scrolled.setPolicy(.automatic, .never); // Only scrollable horizontal
-        
+
         scrolled.setMinContentHeight(40);
         scrolled.setMaxContentHeight(40);
 
@@ -121,7 +138,7 @@ pub const Launcher = extern struct {
 
         priv.app_box = null;
         priv.allocator = null;
-        
+
         gobject.Object.virtual_methods.dispose.call(Class.parent, self.as(Parent));
     }
 

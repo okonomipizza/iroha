@@ -3,7 +3,6 @@ const gio = @import("gio");
 const glib = @import("glib");
 const gtk = @import("gtk");
 const gobject = @import("gobject");
-const DotDesktopParser = @import("desktop.zig").DotDesktopParser;
 const AppLauncheDataManager = @import("data.zig").AppLaunchManager;
 
 pub const AppEntry = struct {
@@ -100,8 +99,6 @@ pub const AppEntry = struct {
 
             if (result == 0) {
                 if (error_ptr) |err| {
-                    // const message = std.mem.span(err.f_message);
-                    // std.debug.print("Failed to launch app: {s}\n", .{message});
                     glib.Error.free(err);
                 }
             } else {
