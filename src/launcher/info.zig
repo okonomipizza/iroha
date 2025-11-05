@@ -4,11 +4,13 @@ const glib = @import("glib");
 const gtk = @import("gtk");
 const gobject = @import("gobject");
 const DotDesktopParser = @import("desktop.zig").DotDesktopParser;
+const AppLauncheDataManager = @import("data.zig").AppLaunchManager;
 
 pub const AppEntry = struct {
     name: [*:0]const u8,
     icon: ?*gio.Icon,
     app_info: *gio.AppInfo,
+    allocator: std.mem.Allocator,
 
     const Self = @This();
 
@@ -36,20 +38,63 @@ pub const AppEntry = struct {
             box.append(placefolder.as(gtk.Widget));
         }
 
-        const app_ref = gobject.Object.ref(self.app_info.as(gobject.Object));
-        gobject.Object.setData(button.as(gobject.Object), "app-info", app_ref);
+        const UserData = struct {
+            app_info: *gio.AppInfo,
+            allocator: std.mem.Allocator,
+        };
+
+        const user_data = self.allocator.create(UserData) catch return button;
+
+        _ = gobject.Object.ref(self.app_info.as(gobject.Object));
+        user_data.* = .{
+            .app_info = self.app_info,
+            .allocator = self.allocator,
+        };
+
+        gobject.Object.setData(button.as(gobject.Object), "iroha-app-data", user_data);
 
         _ = gtk.Button.signals.clicked.connect(button, ?*anyopaque, &onAppButtonClicked, null, .{});
 
+        _ = gtk.Widget.signals.destroy.connect(
+            button,
+            ?*anyopaque,
+            &onButtonDestroy,
+            null,
+            .{},
+        );
+
         return button;
+    }
+
+    fn onButtonDestroy(button: *gtk.Button, user_data: ?*anyopaque) callconv(.c) void {
+        _ = user_data;
+        const UserData = struct {
+            app_info: *gio.AppInfo,
+            allocator: std.mem.Allocator,
+        };
+
+        const data_ptr = gobject.Object.getData(button.as(gobject.Object), "iroha-app-data");
+        if (data_ptr) |ptr| {
+            const data: *UserData = @ptrCast(@alignCast(ptr));
+            gobject.Object.unref(data.app_info.as(gobject.Object));
+            data.allocator.destroy(data);
+        }
     }
 
     fn onAppButtonClicked(button: *gtk.Button, user_data: ?*anyopaque) callconv(.c) void {
         _ = user_data;
 
-        const app_info_ptr = gobject.Object.getData(button.as(gobject.Object), "app-info");
-        if (app_info_ptr) |ptr| {
-            const app_info: *gio.AppInfo = @ptrCast(@alignCast(ptr));
+        const UserData = struct {
+            app_info: *gio.AppInfo,
+            allocator: std.mem.Allocator,
+        };
+
+        const data_ptr = gobject.Object.getData(button.as(gobject.Object), "iroha-app-data");
+        if (data_ptr) |ptr| {
+            const data: *UserData = @ptrCast(@alignCast(ptr));
+            const app_info = data.app_info;
+            const allocator = data.allocator;
+
             var error_ptr: ?*glib.Error = null;
             const result = app_info.launch(null, null, &error_ptr);
 
@@ -60,9 +105,10 @@ pub const AppEntry = struct {
                     glib.Error.free(err);
                 }
             } else {
-                // const app_name = app_info.getName();
-                // const name = std.mem.span(app_name);
-                // std.debug.print("Launched app: {s}\n", .{name});
+                const app_name_cstr = app_info.getName();
+                const app_name = std.mem.span(app_name_cstr);
+
+                AppLauncheDataManager.appendAppName(allocator, app_name) catch return;
             }
         }
     }
@@ -85,6 +131,7 @@ pub fn getAllApplications(allocator: std.mem.Allocator) !std.ArrayList(AppEntry)
                 .name = app_info.getName(),
                 .icon = app_info.getIcon(),
                 .app_info = app_info,
+                .allocator = allocator,
             };
             try apps.append(allocator, entry);
         }

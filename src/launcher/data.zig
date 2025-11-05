@@ -1,12 +1,12 @@
 const std = @import("std");
 const testing = std.testing;
 
-const AppLaunchStats = struct {
+pub const AppLaunchStats = struct {
     app_name: []const u8,
     launch_count: usize,
 };
 
-const AppLaunchManager = struct {
+pub const AppLaunchManager = struct {
     stats: std.ArrayList(AppLaunchStats),
     allocator: std.mem.Allocator,
     const Self = @This();
@@ -119,7 +119,7 @@ const AppLaunchManager = struct {
         }
     }
 
-    fn length(self: *const Self) usize {
+    pub fn length(self: *const Self) usize {
         return self.stats.items.len;
     }
 
@@ -142,10 +142,35 @@ const AppLaunchManager = struct {
         };
         defer file.close();
 
-        try file.seekFromEnd(0);
+        const file_size = try file.getEndPos();
+        const content = try allocator.alloc(u8, file_size);
+        defer allocator.free(content);
+        _ = try file.readAll(content);
 
-        try file.writeAll(app_name);
-        try file.writeAll("\n");
+        var lines = try std.ArrayList([]const u8).initCapacity(allocator, 30);
+        defer lines.deinit(allocator);
+        
+        var it = std.mem.splitScalar(u8, content, '\n');
+        while (it.next()) |line| {
+            if (line.len > 0) {
+                try lines.append(allocator, line);
+            }
+        }
+        
+        if (lines.items.len >= 30) {
+            _ = lines.orderedRemove(0);
+        }
+
+        try lines.append(allocator, app_name);
+
+        try file.seekTo(0);
+        try file.setEndPos(0);
+
+        for (lines.items) |line| {
+            try file.writeAll(line);
+            try file.writeAll("\n");
+        }
+
         try file.sync();
     }
 };

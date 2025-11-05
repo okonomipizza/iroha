@@ -2,6 +2,7 @@ const std = @import("std");
 const glib = @import("glib");
 const gobject = @import("gobject");
 const gtk = @import("gtk");
+const AppLauncheDataManager = @import("data.zig").AppLaunchManager;
 
 const info = @import("./info.zig");
 
@@ -38,8 +39,26 @@ pub const Launcher = extern struct {
         const apps = try info.getAllApplications(allocator);
         priv.apps = apps;
         priv.allocator = allocator;
+        const data_manager = try AppLauncheDataManager.init(allocator);
 
         if (priv.app_box) |app_box| {
+            // sort app order
+            var i: usize = 0;
+            while (i < data_manager.length()) : (i += 1) {
+                const target = data_manager.stats.items[i].app_name;
+                var t = i;
+                while (t < apps.items.len) : (t += 1) {
+                    const current = std.mem.span(apps.items[t].name);
+                    if (std.mem.eql(u8, target, current)) {
+                        if (t == i) break;
+                        const temp = apps.items[i];
+                        apps.items[i] = apps.items[t];
+                        apps.items[t] = temp;
+                        break;
+                    }
+                }
+            }
+            // Add app launch buttons
             for (apps.items) |*app| {
                 const widget = app.createWidget();
                 app_box.append(widget.as(gtk.Widget));
