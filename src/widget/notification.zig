@@ -261,19 +261,17 @@ pub const NotificationState = extern struct {
         priv.allocator = allocator;
         priv.manager = try NotificationManager.init(allocator, max_count, config);
 
-
         return self;
     }
 
     pub fn addNotification(self: *Self, app_name: []const u8, message: []const u8, id: u32) !void {
         const allocator = self.private().allocator;
         const data = try NotificationData.init(allocator, app_name, message, id);
+        errdefer data.deinit(allocator);
+
         const priv = self.private();
         if (priv.manager) |manager| {
             try manager.append(data);
-
-            const ctx = try priv.allocator.create(EmitContext);
-            ctx.* = .{ .state = self, .data = data.* };
         }
     }
 
