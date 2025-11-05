@@ -84,3 +84,63 @@ test "AppLaunchManager.sort - sorts by launch_count in descending order" {
     try testing.expectEqual(@as(usize, 3), manager.stats.items[3].launch_count);
     try testing.expectEqualStrings("Terminal", manager.stats.items[3].app_name);
 }
+
+test "AppLaunchManager.sort - handles empty list" {
+    const allocator = testing.allocator;
+    
+    var manager = try AppLaunchManager.init(allocator);
+    defer manager.deinit();
+    
+    try manager.sort();
+    
+    try testing.expectEqual(@as(usize, 0), manager.length());
+}
+
+test "AppLaunchManager.sort - handles single item" {
+    const allocator = testing.allocator;
+    
+    var manager = try AppLaunchManager.init(allocator);
+    defer manager.deinit();
+    
+    try manager.stats.append(allocator, .{ .app_name = "Terminal", .launch_count = 7 });
+    
+    try manager.sort();
+    
+    try testing.expectEqual(@as(usize, 1), manager.length());
+    try testing.expectEqual(@as(usize, 7), manager.stats.items[0].launch_count);
+}
+
+test "AppLaunchManager.sort - handles equal launch_counts" {
+    const allocator = testing.allocator;
+    
+    var manager = try AppLaunchManager.init(allocator);
+    defer manager.deinit();
+    
+    try manager.stats.append(allocator, .{ .app_name = "App1", .launch_count = 5 });
+    try manager.stats.append(allocator, .{ .app_name = "App2", .launch_count = 5 });
+    try manager.stats.append(allocator, .{ .app_name = "App3", .launch_count = 5 });
+    
+    try manager.sort();
+    
+    try testing.expectEqual(@as(usize, 3), manager.length());
+    try testing.expectEqualStrings("App1", manager.stats.items[0].app_name);
+    try testing.expectEqualStrings("App2", manager.stats.items[1].app_name);
+    try testing.expectEqualStrings("App3", manager.stats.items[2].app_name);
+}
+
+test "AppLaunchManager.sort - already sorted list" {
+    const allocator = testing.allocator;
+    
+    var manager = try AppLaunchManager.init(allocator);
+    defer manager.deinit();
+    
+    try manager.stats.append(allocator, .{ .app_name = "App1", .launch_count = 10 });
+    try manager.stats.append(allocator, .{ .app_name = "App2", .launch_count = 8 });
+    try manager.stats.append(allocator, .{ .app_name = "App3", .launch_count = 5 });
+    
+    try manager.sort();
+    
+    try testing.expectEqual(@as(usize, 10), manager.stats.items[0].launch_count);
+    try testing.expectEqual(@as(usize, 8), manager.stats.items[1].launch_count);
+    try testing.expectEqual(@as(usize, 5), manager.stats.items[2].launch_count);
+}
