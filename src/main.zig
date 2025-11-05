@@ -15,6 +15,7 @@ const app_config = @import("config.zig");
 const Config = app_config.Config;
 const loadCss = @import("css.zig").loadCss;
 const notification_daemon = @import("daemon.zig");
+const Launcher = @import("./launcher/launcher.zig").Launcher;
 
 
 // Notification widget にシグナルを伝播できるように、*Object型にする
@@ -82,19 +83,17 @@ fn buildUI(window: *gtk.ApplicationWindow, ctx: *AppContext) void {
     var menu = SystemMenu.new(ctx);
     // Create music player control component
     var music = Music.new(ctx.allocator());
-    // Create animated message component
-    // const messages = ctx.config.message_config.messages;
-    // const msg_ptr = ctx.allocator().create(std.json.Value) catch {
-    //     std.debug.print("Failed to allocate memory for messages\n", .{});
-    //     std.posix.exit(1);
-    // };
-    // msg_ptr.* = messages;
+
+    var launcher = Launcher.new(ctx.allocator()) catch {
+        std.posix.exit(1);
+    };
     
     var norification = Notification.new(ctx.notification_state.?);
     // Create clock component (JST)
     var clock = Clock.new(9);
 
     gtk.Box.append(left_box, menu.as(gtk.Widget));
+    gtk.Box.append(left_box, launcher.as(gtk.Widget));
     gtk.Box.append(left_box, music.as(gtk.Widget));
     gtk.Box.append(right_box, norification.as(gtk.Widget));
     gtk.Box.append(right_box, clock.as(gtk.Widget));
@@ -107,6 +106,9 @@ fn buildUI(window: *gtk.ApplicationWindow, ctx: *AppContext) void {
 pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
+
+    // _ = try @import("./launcher/info.zig").getAllApplications(arena.allocator());
+
 
     const config_ptr = try arena.allocator().create(Config);
     config_ptr.* = try Config.init(arena.allocator());

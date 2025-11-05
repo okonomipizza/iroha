@@ -30,6 +30,9 @@ fn generateCssVariables(allocator: std.mem.Allocator, config: *const Config) ![]
     const system_color_cfg = try ColorConfig.fromRgba(config.system_config.color);
     const system_colors = try system_color_cfg.generateColorVariants(allocator);
 
+    const launcher_color_cfg = try ColorConfig.fromRgba(config.launcher_config.color);
+    const launcher_colors = try launcher_color_cfg.generateColorVariants(allocator);
+
     const music_color_cfg = try ColorConfig.fromRgba(config.music_config.color);
     const music_colors = try music_color_cfg.generateColorVariants(allocator);
 
@@ -54,6 +57,12 @@ fn generateCssVariables(allocator: std.mem.Allocator, config: *const Config) ![]
         \\    --color-system-medium: {s};
         \\    --color-system-dim: {s};
         \\    --color-system-dimmer: {s};
+        \\
+        \\    --color-launcher: {s};
+        \\    --color-launcher-light: {s};
+        \\    --color-launcher-medium: {s};
+        \\    --color-launcher-dim: {s};
+        \\    --color-launcher-dimmer: {s};
         \\
         \\    --color-music: {s};
         \\    --color-music-light: {s};
@@ -92,6 +101,11 @@ fn generateCssVariables(allocator: std.mem.Allocator, config: *const Config) ![]
         system_colors.dim,
         system_colors.light,
         system_colors.dimmer,
+        launcher_colors.base,
+        launcher_colors.bright,
+        launcher_colors.dim,
+        launcher_colors.light,
+        launcher_colors.dimmer,
         music_colors.base,
         music_colors.bright,
         music_colors.dim,
@@ -229,6 +243,54 @@ fn generateMusicCss(allocator: std.mem.Allocator, config: *const Config) ![]cons
     return css;
 }
 
+fn generateLauncherCss(allocator: std.mem.Allocator, config: *const Config) ![]const u8 {
+    _ = config;
+    const css = try std.fmt.allocPrint(allocator,
+        \\.launcher {{
+        \\    color: var(--color-white);
+        \\    font-size: 8px;
+        \\    min-height: 20px;
+        \\    max-height: 20px;
+        \\    margin: 2px 6px;
+        \\    background-color: var(--color-black-light);
+        \\    border: 1px solid var(--color-launcher);
+        \\    border-radius: var(--border-radius-large);
+        \\    overflow: hidden;
+        \\}}
+        \\
+        \\.launcher scrollbar.horizontal {{
+        \\    min-height: 1px;
+        \\    max-height: 1px;
+        \\    background: transparent;
+        \\    border: none;
+        \\}}
+        \\
+        \\.launcher scrollbar.horizontal slider {{
+        \\    min-height: 1px;
+        \\    border-radius: 1px;
+        \\    background-color: var(--color-launcher);
+        \\    margin-left: 30%;
+        \\}}
+        \\
+        \\.launcher scrollbar.horizontal:hover slider {{
+        \\    background-color: var(--color-launcher);
+        \\}}
+        \\
+        \\.launcher-app-icon {{
+        \\    margin-left: 8px;
+        \\    margin-right: 2px;
+        \\    margin-top: 4px;
+        \\    margin-bottom: 4px;
+        \\    padding: 0px;
+        \\    min-width: 24px;
+        \\    min-height: 16px;
+        \\    border: none;
+        \\    background: var(--color-transparent);
+        \\    background-color: var(--color-transparent);
+        \\}}
+    , .{});
+    return css;
+}
 fn generateNotificationCss(allocator: std.mem.Allocator, config: *const Config) ![]const u8 {
     const css = try std.fmt.allocPrint(allocator,
         \\.notification {{
@@ -275,9 +337,11 @@ fn generateCssFromConfig(allocator: std.mem.Allocator, config: *const Config) ![
     const root_css = try generateCssVariables(allocator, config);
     const system_css = try generateSystemCss(allocator, config);
     const music_css = try generateMusicCss(allocator, config);
+    const launcher_css = try generateLauncherCss(allocator, config);
     const notification_css = try generateNotificationCss(allocator, config);
     const clock_css = try generateClockCss(allocator, config);
     const css = try std.fmt.allocPrint(allocator,
+        \\{s}
         \\{s}
         \\{s}
         \\{s}
@@ -293,7 +357,7 @@ fn generateCssFromConfig(allocator: std.mem.Allocator, config: *const Config) ![
         \\}}
         \\
         \\
-    , .{ root_css, system_css, music_css, notification_css, clock_css });
+    , .{ root_css, system_css, music_css, launcher_css, notification_css, clock_css });
 
     return css;
 }
