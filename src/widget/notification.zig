@@ -6,69 +6,26 @@ const gdk = @import("gdk");
 const pango = @import("pango");
 const Config = @import("../config.zig").Config;
 
-/// Supported Notifition type
-pub const NotificationType = enum {
-    config, // Loaded from app config file
-    notify, // Received from D-bus Notify
-};
-
-/// D-bus notification data
 pub const NotificationData = struct {
-    app_name: ?[*:0]const u8,
     message: ?[*:0]const u8,
-    id: ?u32,
-    type: NotificationType,
 
     const Self = @This();
 
-    /// Create a notification from D-bus notification event
-    /// Used when receiving notifications from D-bus
-    pub fn init(allocator: std.mem.Allocator, app_name: []const u8, message: []const u8, id: u32) !*Self {
+    pub fn init(allocator: std.mem.Allocator, message: []const u8) !*Self {
         const self = try allocator.create(Self);
         errdefer allocator.destroy(self);
-
-        const app_name_cstr = try allocator.dupeZ(u8, app_name);
-        errdefer allocator.free(app_name_cstr);
 
         const message_cstr = try allocator.dupeZ(u8, message);
         errdefer allocator.free(message_cstr);
 
         self.* = .{
-            .app_name = app_name_cstr,
             .message = message_cstr,
-            .id = id,
-            .type = .notify,
-        };
-
-        return self;
-    }
-
-    /// Create a notification from app configuration.
-    /// Used when loading notifications from the config file.
-    pub fn fromConfig(allocator: std.mem.Allocator, message: []const u8) !*Self {
-        const self = try allocator.create(Self);
-        errdefer allocator.destroy(self);
-
-        const app_name_cstr = try allocator.dupeZ(u8, "iroha");
-        errdefer allocator.free(app_name_cstr);
-
-        const message_cstr = try allocator.dupeZ(u8, message);
-        errdefer allocator.free(message_cstr);
-
-        self.* = .{
-            .app_name = app_name_cstr,
-            .message = message_cstr,
-            .id = null,
-            .type = .config,
         };
 
         return self;
     }
 
     pub fn deinit(self: *Self, allocator: std.mem.Allocator) void {
-        if (self.app_name) |app_name| {
-            allocator.free(std.mem.span(app_name));
-        }
         if (self.message) |message| {
             allocator.free(std.mem.span(message));
         }
@@ -106,10 +63,9 @@ const NotificationManager = struct {
     head: ?*NotificationNode,
     tail: ?*NotificationNode,
     current: ?*NotificationNode,
-    max_couont: usize,
+    max_count: usize,
     count: usize,
     allocator: std.mem.Allocator,
-    mutex: std.Thread.Mutex,
 
     const Self = @This();
 
@@ -119,17 +75,16 @@ const NotificationManager = struct {
             .head = null,
             .tail = null,
             .current = null,
+            .max_count = max_count,
             .count = 0,
-            .max_couont = max_count,
             .allocator = allocator,
-            .mutex = .{},
         };
 
         // Load default messages that dispalyed at notification bar from config file
         if (config.message_config.messages == .array) {
             for (config.message_config.messages.array.items) |item| {
                 if (item == .string) {
-                    const data = try NotificationData.fromConfig(allocator, item.string);
+                    const data = try NotificationData.init(allocator, item.string);
                     try manager.append(data);
                 }
             }
@@ -138,10 +93,7 @@ const NotificationManager = struct {
     }
 
     pub fn append(self: *Self, data: *NotificationData) !void {
-        self.mutex.lock();
-        defer self.mutex.unlock();
-
-        if (self.count >= self.max_couont) {
+        if (self.count >= self.max_count) {
             self.removeOldest();
         }
 
@@ -195,9 +147,6 @@ const NotificationManager = struct {
     /// If the current node is the tail, wrap around to the head.
     /// Returns null if the list is empty.
     pub fn next(self: *Self) ?*NotificationNode {
-        self.mutex.lock();
-        defer self.mutex.unlock();
-
         if (self.current) |old_current| {
             if (self.tail == old_current) {
                 self.current = self.head;
@@ -210,9 +159,6 @@ const NotificationManager = struct {
     }
 
     pub fn clear(self: *Self) void {
-        self.mutex.lock();
-        defer self.mutex.unlock();
-
         while (self.head) |head| {
             self.head = head.next;
             head.destroy(self.allocator);
@@ -228,127 +174,6 @@ const NotificationManager = struct {
     }
 };
 
-/// GObject that manages notification state and emits signals
-pub const NotificationState = extern struct {
-    parent_instance: gobject.Object,
-
-    pub const Parent = gobject.Object;
-
-    const Private = struct {
-        manager: ?*NotificationManager,
-        allocator: std.mem.Allocator,
-
-        pub var offset: c_int = 0;
-    };
-
-    const Self = @This();
-
-    pub const getGObjectType = gobject.ext.defineClass(Self, .{
-        .name = "IrohaNotificationState",
-        .classInit = &Class.init,
-        .parent_class = &Class.parent,
-        .private = .{ .Type = Private, .offset = &Private.offset },
-    });
-
-    // Signal ID
-    var signal_notification_received: c_uint = 0;
-
-    pub fn new(allocator: std.mem.Allocator, max_count: usize, config: *Config) !*Self {
-        const self = gobject.ext.newInstance(Self, .{});
-        errdefer self.unref();
-
-        const priv = self.private();
-        priv.allocator = allocator;
-        priv.manager = try NotificationManager.init(allocator, max_count, config);
-
-        return self;
-    }
-
-    pub fn addNotification(self: *Self, app_name: []const u8, message: []const u8, id: u32) !void {
-        const allocator = self.private().allocator;
-        const data = try NotificationData.init(allocator, app_name, message, id);
-        errdefer data.deinit(allocator);
-
-        const priv = self.private();
-        if (priv.manager) |manager| {
-            try manager.append(data);
-        }
-    }
-
-    pub fn getCurrent(self: *Self) ?*NotificationData {
-        const priv = self.private();
-        if (priv.manager) |manager| {
-            if (manager.getCurrent()) |node| {
-                return node.data;
-            }
-        }
-        return null;
-    }
-
-    pub fn next(self: *Self) ?*NotificationData {
-        const priv = self.private();
-        if (priv.manager) |manager| {
-            if (manager.next()) |node| {
-                return node.data;
-            }
-        }
-        return null;
-    }
-
-    pub fn clear(self: *Self) void {
-        const priv = self.private();
-        if (priv.manager) |manager| {
-            manager.clear();
-        }
-    }
-
-    const EmitContext = struct {
-        state: *Self,
-        data: NotificationData,
-    };
-
-    fn finalize(self: *Self) callconv(.c) void {
-        const priv = self.private();
-
-        if (priv.manager) |manager| {
-            manager.deinit();
-            priv.manager = null;
-        }
-
-        gobject.Object.virtual_methods.finalize.call(Class.parent, self.as(gobject.Object));
-    }
-
-    fn private(self: *Self) *Private {
-        return gobject.ext.impl_helpers.getPrivate(self, Private, Private.offset);
-    }
-
-    pub fn as(self: *Self, comptime T: type) *T {
-        if (T == gobject.Object or @hasDecl(T, "parent_instance")) {
-            return @ptrCast(self);
-        }
-        return gobject.ext.as(T, self);
-    }
-
-    pub fn ref(self: *Self) *Self {
-        return gobject.ext.ref(self, Self);
-    }
-
-    pub fn unref(self: *Self) void {
-        gobject.Object.unref(self.as(gobject.Object));
-    }
-
-    pub const Class = extern struct {
-        parent_class: gobject.Object.Class,
-        var parent: *gobject.Object.Class = undefined;
-
-        pub const Instance = Self;
-
-        fn init(class: *Class) callconv(.c) void {
-            gobject.Object.virtual_methods.finalize.implement(class, &finalize);
-        }
-    };
-};
-
 /// A widget that displays messages with animations.
 ///
 /// Shows notifications that can be cycled through with visual transitions.
@@ -359,13 +184,7 @@ pub const Notification = extern struct {
     const PADDING_HORIZONTAL: c_int = 8;
 
     const Private = struct {
-        // manager: ?*MessageManager,
-        notification_state: ?*NotificationState,
-        handler_id: c_ulong,
-
-        // current_node: ?*MessageNode,
-        // Currently displayed message.
-        // current_message: ?[*:0]const u8, // Currently displayed message
+        manager: ?*NotificationManager,
 
         // Widgets for display
         main_hbox: *gtk.Box,
@@ -394,26 +213,21 @@ pub const Notification = extern struct {
     });
 
     /// Returns initialized instance
-    pub fn new(notification_state: *NotificationState) *Notification {
+    pub fn new(allocator: std.mem.Allocator, cfg: *Config) *Notification {
         var notification = gobject.ext.newInstance(Notification, .{});
-
         const notification_style_context = gtk.Widget.getStyleContext(notification.as(gtk.Widget));
         gtk.StyleContext.addClass(notification_style_context, "notification");
 
-        var priv = notification.private();
-        priv.notification_state = notification_state;
+        const max_count: usize = 50;
+        var manager = NotificationManager.init(allocator, max_count, cfg) catch {
+            std.posix.exit(0);
+        };
 
-        priv.handler_id = gobject.signalConnectData(
-            notification_state.as(gobject.Object),
-            "notification-received",
-            @as(gobject.Callback, @ptrCast(&onNotificationReceived)),
-            notification,
-            null,
-            .{},
-        );
+        const priv = notification.private();
+        priv.manager = manager;
 
-        if (notification_state.getCurrent()) |current_data| {
-            notification.updateDisplay(current_data);
+        if (manager.getCurrent()) |current_data| {
+            notification.updateDisplay(current_data.data);
         } else {
             gtk.Label.setText(priv.label, "No notification");
         }
@@ -429,7 +243,7 @@ pub const Notification = extern struct {
         return priv.widget_width - PADDING_HORIZONTAL * 2;
     }
 
-    fn updateDisplay(self: *Notification, data: *const NotificationData) void {
+    fn updateDisplay(self: *Notification, data: *NotificationData) void {
         var priv = self.private();
 
         const message_to_show = data.message orelse "nothig to show";
@@ -445,26 +259,9 @@ pub const Notification = extern struct {
         priv.scroll_position = @as(f64, @floatFromInt(available_width));
     }
 
-    fn onNotificationReceived(
-        state: *NotificationState,
-        notif_data: *const NotificationData,
-        user_data: ?*anyopaque,
-    ) callconv(.c) void {
-        _ = user_data;
-        // const self = @as(*Notification, @ptrCast(@alignCast(user_data.?)));
-        const app_name = notif_data.app_name orelse "app_name";
-        const message = notif_data.message orelse "message";
-        const id = notif_data.id orelse 0;
-        state.addNotification(std.mem.span(app_name), std.mem.span(message), id) catch {
-            std.debug.print("error occured\n", .{});
-        };
-    }
-
     fn init(notification: *Notification, _: *Class) callconv(.c) void {
         var priv = notification.private();
 
-        priv.notification_state = null;
-        priv.handler_id = 0;
         priv.scroll_position = 0.0;
         priv.scroll_tick_id = 0;
         priv.frame_count = 0;
@@ -526,14 +323,12 @@ pub const Notification = extern struct {
             priv.scroll_position -= scroll_speed;
 
             // Calculate the place where the animated text completely hides to the end.
-            // const available_width = notification.availableWidth();
             const text_hidden = @as(f64, @floatFromInt(-priv.text_width));
 
             if (priv.scroll_position <= text_hidden) {
-                if (priv.notification_state) |state| {
-                    if (state.next()) |next_data| {
-                        notification.updateDisplay(next_data);
-                        std.posix.nanosleep(0, 900_000_000);
+                if (priv.manager) |manager| {
+                    if (manager.next()) |next_data| {
+                        notification.updateDisplay(next_data.data);
                     }
                 }
             }
@@ -566,13 +361,9 @@ pub const Notification = extern struct {
             priv.scroll_tick_id = 0;
         }
 
-        // Remove signal connection
-        //
-        if (priv.notification_state) |state| {
-            if (priv.handler_id != 0) {
-                gobject.signalHandlerDisconnect(state.as(gobject.Object), priv.handler_id);
-                priv.handler_id = 0;
-            }
+        if (priv.manager) |manager| {
+            manager.deinit();
+            priv.manager = null;
         }
 
         gobject.Object.virtual_methods.dispose.call(Class.parent, notification.as(Parent));

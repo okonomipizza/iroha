@@ -9,23 +9,18 @@ const Clock = @import("./widget/clock.zig").Clock;
 const SystemMenu = @import("./widget/system.zig").SystemMenu;
 const Music = @import("./widget/music.zig").Music;
 const Notification = @import("./widget/notification.zig").Notification;
-const NotificationState = @import("./widget/notification.zig").NotificationState;
 const jsonc = @import("zig_jsonc");
 const app_config = @import("config.zig");
 const Config = app_config.Config;
 const loadCss = @import("css.zig").loadCss;
-const notification_daemon = @import("daemon.zig");
 const Launcher = @import("./launcher/launcher.zig").Launcher;
 
-
-// Notification widget にシグナルを伝播できるように、*Object型にする
 pub const AppContext = struct {
     arena: *std.heap.ArenaAllocator,
     config: *Config,
     css_provider: ?*gtk.CssProvider = null,
     window: ?*gtk.ApplicationWindow = null,
     notification: ?*Notification = null,
-    notification_state: ?*NotificationState = null,
     music: ?*Music = null,
     clock: ?*Clock = null,
     system_menu: ?*SystemMenu = null,
@@ -88,7 +83,7 @@ fn buildUI(window: *gtk.ApplicationWindow, ctx: *AppContext) void {
         std.posix.exit(1);
     };
     
-    var norification = Notification.new(ctx.notification_state.?);
+    var norification = Notification.new(ctx.allocator(), ctx.config);
     // Create clock component (JST)
     var clock = Clock.new(9);
 
@@ -107,23 +102,14 @@ pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
 
-    // _ = try @import("./launcher/info.zig").getAllApplications(arena.allocator());
-
-
     const config_ptr = try arena.allocator().create(Config);
     config_ptr.* = try Config.init(arena.allocator());
-
-    const notification_state = try NotificationState.new(arena.allocator(), 100, config_ptr);
 
     const ctx = try arena.allocator().create(AppContext);
     ctx.* = .{
         .arena = &arena,
         .config = config_ptr,
-        .notification_state = notification_state,
     };
-
-    const owner_id = notification_daemon.startNotificationDaemon(notification_state);
-    std.debug.print("通知デーモン owner_id: {}\n", .{owner_id});
 
     var app = gtk.Application.new("org.iroha.systembar", .{});
     defer app.unref();
