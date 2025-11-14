@@ -34,7 +34,7 @@
 in
   stdenv.mkDerivation (finalAttrs: {
     pname = "iroha";
-    version = "0.2.2-${revision}";
+    version = "0.2.3-${revision}";
 
     src = lib.cleanSource ../.;
 
