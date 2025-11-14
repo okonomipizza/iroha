@@ -8,7 +8,7 @@ const gdk = @import("gdk");
 const Clock = @import("./widget/clock.zig").Clock;
 const SystemMenu = @import("./widget/system.zig").SystemMenu;
 const Music = @import("./widget/music.zig").Music;
-const Notification = @import("./widget/notification.zig").Notification;
+// const Notification = @import("./widget/notification.zig").Notification;
 const jsonc = @import("zig_jsonc");
 const app_config = @import("config.zig");
 const Config = app_config.Config;
@@ -20,7 +20,7 @@ pub const AppContext = struct {
     config: *Config,
     css_provider: ?*gtk.CssProvider = null,
     window: ?*gtk.ApplicationWindow = null,
-    notification: ?*Notification = null,
+    // notification: ?*Notification = null,
     music: ?*Music = null,
     clock: ?*Clock = null,
     system_menu: ?*SystemMenu = null,
@@ -83,14 +83,13 @@ fn buildUI(window: *gtk.ApplicationWindow, ctx: *AppContext) void {
         std.posix.exit(1);
     };
     
-    var norification = Notification.new(ctx.allocator(), ctx.config);
+    // var norification = Notification.new(ctx.allocator(), ctx.config);
     // Create clock component (JST)
     var clock = Clock.new(9);
 
     gtk.Box.append(left_box, menu.as(gtk.Widget));
     gtk.Box.append(left_box, launcher.as(gtk.Widget));
-    gtk.Box.append(left_box, music.as(gtk.Widget));
-    gtk.Box.append(right_box, norification.as(gtk.Widget));
+    gtk.Box.append(right_box, music.as(gtk.Widget));
     gtk.Box.append(right_box, clock.as(gtk.Widget));
 
     gtk.Box.append(main_box, left_box.as(gtk.Widget));
