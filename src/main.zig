@@ -70,11 +70,191 @@ fn activate(app: *gtk.Application, user_data: ?*anyopaque) callconv(.c) void {
         };
         const window = @as(*gtk.ApplicationWindow, @ptrCast(window_obj));
 
-        const music_container_obj = gtk.Builder.getObject(builder, "music_container") orelse {
-            std.debug.print("Failed to get music_container from UI file\n", .{});
+        // Get music widgets from Blueprint
+        const music_button: *gtk.MenuButton = @ptrCast(gtk.Builder.getObject(builder, "music_button"));
+        const music_popover: *gtk.Popover = @ptrCast(gtk.Builder.getObject(builder, "music_popover"));
+        const album_art: *gtk.Image = @ptrCast(gtk.Builder.getObject(builder, "album_art"));
+        const title_label: *gtk.Label = @ptrCast(gtk.Builder.getObject(builder, "title_label"));
+        const artist_label: *gtk.Label = @ptrCast(gtk.Builder.getObject(builder, "artist_label"));
+        const prev_button: *gtk.Button = @ptrCast(gtk.Builder.getObject(builder, "prev_button"));
+        const play_pause_button: *gtk.Button = @ptrCast(gtk.Builder.getObject(builder, "play_pause_button"));
+        const next_button: *gtk.Button = @ptrCast(gtk.Builder.getObject(builder, "next_button"));
+
+        // Initialize Music widget
+        var music = Music.init(
+            allocator,
+            music_button,
+            music_popover,
+            album_art,
+            title_label,
+            artist_label,
+            prev_button,
+            play_pause_button,
+            next_button,
+        ) catch {
+            std.debug.print("Failed to initialized music widget\n", .{});
             std.posix.exit(1);
         };
-        const music_container = @as(*gtk.Box, @ptrCast(music_container_obj));
+        music.connectSignals();
+
+        music.start();
+
+        // Setup hover behavior for music popover
+        const PopoverTimerData = struct {
+            popover: *gtk.Popover,
+            timer_id: ?c_uint = null,
+        };
+
+        const timer_data = allocator.create(PopoverTimerData) catch {
+            std.posix.exit(1);
+        };
+        timer_data.* = .{ .popover = music_popover, .timer_id = null };
+
+        // Add motion controllers to control buttons to prevent popover closing
+        const control_buttons = [_]*gtk.Button{ prev_button, play_pause_button, next_button };
+        for (control_buttons) |btn| {
+            const btn_motion = gtk.EventControllerMotion.new();
+
+            _ = gtk.EventControllerMotion.signals.enter.connect(
+                btn_motion,
+                ?*anyopaque,
+                struct {
+                    fn callback(_: *gtk.EventControllerMotion, _: f64, _: f64, ctx: ?*anyopaque) callconv(.c) void {
+                        if (ctx) |c| {
+                            const timer_data_ptr = @as(*PopoverTimerData, @ptrCast(@alignCast(c)));
+                            // Cancel any pending close timer
+                            if (timer_data_ptr.timer_id) |id| {
+                                _ = glib.Source.remove(id);
+                                timer_data_ptr.timer_id = null;
+                            }
+                        }
+                    }
+                }.callback,
+                @ptrCast(timer_data),
+                .{},
+            );
+
+            gtk.Widget.addController(btn.as(gtk.Widget), btn_motion.as(gtk.EventController));
+        }
+
+        // Add hover functionality to music button
+        const button_motion_controller = gtk.EventControllerMotion.new();
+
+        _ = gtk.EventControllerMotion.signals.enter.connect(
+            button_motion_controller,
+            ?*anyopaque,
+            struct {
+                fn callback(_: *gtk.EventControllerMotion, _: f64, _: f64, ctx: ?*anyopaque) callconv(.c) void {
+                    if (ctx) |ud| {
+                        const timer_data_ptr = @as(*PopoverTimerData, @ptrCast(@alignCast(ud)));
+                        // Cancel pending timer if exists
+                        if (timer_data_ptr.timer_id) |id| {
+                            _ = glib.Source.remove(id);
+                            timer_data_ptr.timer_id = null;
+                        }
+                        gtk.Popover.popup(timer_data_ptr.popover);
+                    }
+                }
+            }.callback,
+            @ptrCast(timer_data),
+            .{},
+        );
+
+        _ = gtk.EventControllerMotion.signals.leave.connect(
+            button_motion_controller,
+            ?*anyopaque,
+            struct {
+                fn callback(_: *gtk.EventControllerMotion, ctx: ?*anyopaque) callconv(.c) void {
+                    if (ctx) |ud| {
+                        const timer_data_ptr = @as(*PopoverTimerData, @ptrCast(@alignCast(ud)));
+                        // Cancel existing timer if any
+                        if (timer_data_ptr.timer_id) |id| {
+                            _ = glib.Source.remove(id);
+                        }
+                        // Set new timer
+                        timer_data_ptr.timer_id = glib.timeoutAddFull(
+                            glib.PRIORITY_DEFAULT,
+                            100,
+                            struct {
+                                fn timeout_callback(user_data_inner: ?*anyopaque) callconv(.c) c_int {
+                                    if (user_data_inner) |udi| {
+                                        const inner_timer_data = @as(*PopoverTimerData, @ptrCast(@alignCast(udi)));
+                                        gtk.Popover.popdown(inner_timer_data.popover);
+                                        inner_timer_data.timer_id = null;
+                                    }
+                                    return 0;
+                                }
+                            }.timeout_callback,
+                            @ptrCast(timer_data_ptr),
+                            null,
+                        );
+                    }
+                }
+            }.callback,
+            @ptrCast(timer_data),
+            .{},
+        );
+
+        gtk.Widget.addController(music_button.as(gtk.Widget), button_motion_controller.as(gtk.EventController));
+
+        // Add motion controller to popover
+        const popover_motion_controller = gtk.EventControllerMotion.new();
+
+        _ = gtk.EventControllerMotion.signals.enter.connect(
+            popover_motion_controller,
+            ?*anyopaque,
+            struct {
+                fn callback(_: *gtk.EventControllerMotion, _: f64, _: f64, ctx: ?*anyopaque) callconv(.c) void {
+                    if (ctx) |ud| {
+                        const timer_data_ptr = @as(*PopoverTimerData, @ptrCast(@alignCast(ud)));
+                        // Cancel pending timer
+                        if (timer_data_ptr.timer_id) |id| {
+                            _ = glib.Source.remove(id);
+                            timer_data_ptr.timer_id = null;
+                        }
+                    }
+                }
+            }.callback,
+            @ptrCast(timer_data),
+            .{},
+        );
+
+        _ = gtk.EventControllerMotion.signals.leave.connect(
+            popover_motion_controller,
+            ?*anyopaque,
+            struct {
+                fn callback(_: *gtk.EventControllerMotion, ctx: ?*anyopaque) callconv(.c) void {
+                    if (ctx) |ud| {
+                        const timer_data_ptr = @as(*PopoverTimerData, @ptrCast(@alignCast(ud)));
+                        // Cancel existing timer if any
+                        if (timer_data_ptr.timer_id) |id| {
+                            _ = glib.Source.remove(id);
+                        }
+                        // Set new timer
+                        timer_data_ptr.timer_id = glib.timeoutAddFull(
+                            glib.PRIORITY_DEFAULT,
+                            100,
+                            struct {
+                                fn timeout_callback(user_data_inner: ?*anyopaque) callconv(.c) c_int {
+                                    if (user_data_inner) |udi| {
+                                        const inner_timer_data = @as(*PopoverTimerData, @ptrCast(@alignCast(udi)));
+                                        gtk.Popover.popdown(inner_timer_data.popover);
+                                        inner_timer_data.timer_id = null;
+                                    }
+                                    return 0;
+                                }
+                            }.timeout_callback,
+                            @ptrCast(timer_data_ptr),
+                            null,
+                        );
+                    }
+                }
+            }.callback,
+            @ptrCast(timer_data),
+            .{},
+        );
+
+        gtk.Widget.addController(music_popover.as(gtk.Widget), popover_motion_controller.as(gtk.EventController));
 
         const clock_container_obj = gtk.Builder.getObject(builder, "clock_container") orelse {
             std.debug.print("Failed to get clock_container from UI file\n", .{});
@@ -82,26 +262,23 @@ fn activate(app: *gtk.Application, user_data: ?*anyopaque) callconv(.c) void {
         };
         const clock_container = @as(*gtk.Box, @ptrCast(clock_container_obj));
 
-        const popover_obj = gtk.Builder.getObject(builder, "menu_popover") orelse {
+        const menu_popover_obj = gtk.Builder.getObject(builder, "menu_popover") orelse {
             std.debug.print("Failed to get menu_popover\n", .{});
             std.posix.exit(1);
         };
-        const popover = @as(*gtk.Popover, @ptrCast(popover_obj));
-        gtk.Popover.setHasArrow(popover, 0);
+        const menu_popover = @as(*gtk.Popover, @ptrCast(menu_popover_obj));
+        gtk.Popover.setHasArrow(menu_popover, 0);
+        gtk.Popover.setHasArrow(music_popover, 0);
 
         const launcher_container_obj = gtk.Builder.getObject(builder, "launcher_container") orelse {
             std.debug.print("Failed to get launcher_container\n", .{});
             std.posix.exit(1);
         };
         const launcher_container = @as(*gtk.Box, @ptrCast(launcher_container_obj));
-        gtk.Popover.setHasArrow(popover, 0);
 
         // Create clock component (JST)
         var clock = Clock.new(9);
         gtk.Box.append(clock_container, clock.as(gtk.Widget));
-
-        var music = Music.new(app_data.allocator);
-        gtk.Box.append(music_container, music.as(gtk.Widget));
 
         var launcher = Launcher.new(app_data.allocator) catch {
             std.debug.print("Failed to initialized launcher\n", .{});

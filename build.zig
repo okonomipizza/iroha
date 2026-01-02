@@ -35,19 +35,17 @@ pub fn build(b: *std.Build) void {
 
     exe.root_module.addImport("zig_jsonc", zig_jsonc.module("zig_jsonc"));
 
-    const ui_dir_path = b.pathJoin(&.{ b.cache_root.path.?, "ui" });
-    const ui_cache_path = b.pathJoin(&.{ ui_dir_path, "system-bar.ui" });
+    // const ui_dir_path = b.pathJoin(&.{ b.cache_root.path.?, "ui" });
+    // const ui_cache_path = b.pathJoin(&.{ ui_dir_path, "system-bar.ui" });
 
-    const mkdir_ui = b.addSystemCommand(&.{ "mkdir", "-p", ui_dir_path });
+    // const mkdir_ui = b.addSystemCommand(&.{ "mkdir", "-p", ui_dir_path });
 
     const blueprint_compile = b.addSystemCommand(&.{
-        "blueprint-compiler",
-        "compile",
-        "src/ui/system-bar.blp",
-        "--output",
-        ui_cache_path,
+        "sh",
+        "-c",
+        "mkdir -p .zig-cache/ui && blueprint-compiler compile --output .zig-cache/ui/system-bar.ui src/ui/system-bar.blp",
     });
-    blueprint_compile.step.dependOn(&mkdir_ui.step);
+
     exe.step.dependOn(&blueprint_compile.step);
 
     const layer_shell_flags = b.run(&.{ "pkg-config", "--cflags", "--libs", "gtk4-layer-shell-0" });

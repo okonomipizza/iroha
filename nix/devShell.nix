@@ -43,6 +43,7 @@
           libadwaita
           zstd
           blueprint-compiler
+          adwaita-icon-theme
         ];
 
       shellHook = ''

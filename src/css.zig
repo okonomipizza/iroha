@@ -18,7 +18,6 @@ pub fn generateCss(allocator: std.mem.Allocator, config: *const Config) ![:0]con
         \\
         \\#main_box {{
         \\  min-height: {d}px;
-        \\  max-height: {d}px;
         \\}}
         \\
     , .{
@@ -28,7 +27,6 @@ pub fn generateCss(allocator: std.mem.Allocator, config: *const Config) ![:0]con
         config.bar.margin.right,
         config.bar.margin.bottom,
         config.bar.margin.left,
-        config.bar.height,
         config.bar.height,
     });
 
@@ -50,21 +48,24 @@ pub fn generateCss(allocator: std.mem.Allocator, config: *const Config) ![:0]con
     });
 
     // Button styles (Clock, Menu buttons)
-    try buffer.writer.writeAll(
-        \\button {
+    try buffer.writer.print(
+        \\button {{
         \\  padding: 0 4px;
         \\  min-height: 0;
         \\  border: none;
         \\  background: transparent;
         \\  border-radius: 4px;
+        \\  color: {s};
         \\  transition: background-color 200ms ease;
-        \\}
+        \\}}
         \\
-        \\button:hover {
+        \\button:hover {{
         \\  background-color: rgba(255, 255, 255, 0.1);
-        \\}
+        \\}}
         \\
-    );
+    , .{
+        config.theme.@"clock-color",
+    });
 
     // Mac-style PopoverMenu
     try buffer.writer.writeAll(
@@ -97,6 +98,53 @@ pub fn generateCss(allocator: std.mem.Allocator, config: *const Config) ![:0]con
         \\popover.menu modelbutton:hover {
         \\ background-color: rgba(137, 180, 250, 0.2);
         \\}
+        \\
+    );
+
+    try buffer.writer.writeAll(
+        \\/* Popover container */
+        \\popover.music-popover {
+        \\  background-color: rgba(40, 40, 50, 0.95);
+        \\  border-radius: 8px;
+        \\  padding: 2px 6px;
+        \\}
+        \\
+        \\/* Popover contents wrapper */
+        \\popover.music-popover > contents {
+        \\  background: transparent;
+        \\  padding: 0;
+        \\  box-shadow: none;
+        \\  border: none;
+        \\}
+        \\
+        \\/* Music control buttons */
+        \\.music-control-button {
+        \\  min-height: 32px;
+        \\  min-width: 32px;
+        \\  padding: 8px;
+        \\  border-radius: 50%;
+        \\  background: transparent;
+        \\  color: #ffffff;
+        \\}
+        \\
+        \\.music-control-button:hover {
+        \\  background-color: rgba(255, 255, 255, 0.15);
+        \\}
+        // \\
+        // \\/* Menu items */
+        // \\popover.menu modelbutton {
+        // \\  min-height: 10px;
+        // \\  padding: 1px 10px;
+        // \\  border-radius: 4px;
+        // \\  background: transparent;
+        // \\  color: #cdd6f4;
+        // \\  transition: all 150ms ease;
+        // \\  box-shadow: none;
+        // \\}
+        // \\
+        // \\popover.menu modelbutton:hover {
+        // \\ background-color: rgba(137, 180, 250, 0.2);
+        // \\}
         \\
     );
     return try buffer.toOwnedSliceSentinel(0);
