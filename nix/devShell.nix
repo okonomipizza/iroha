@@ -17,6 +17,7 @@
     hicolor-icon-theme,
     zstd,
     zls,
+    blueprint-compiler,
 }: let
     zig-gobject-bindings = fetchurl {
         name = "bindings-gnome46.tar.zst";
@@ -41,6 +42,7 @@
           gdk-pixbuf
           libadwaita
           zstd
+          blueprint-compiler
         ];
 
       shellHook = ''

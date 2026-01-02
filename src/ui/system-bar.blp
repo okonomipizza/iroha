@@ -1,0 +1,49 @@
+using Gtk 4.0;
+
+ApplicationWindow window {
+  title: "System Bar";
+
+  Box main_box {
+    orientation: horizontal;
+
+    MenuButton menu_button {
+        icon-name: "open-menu-symbolic";
+        popover: PopoverMenu menu_popover {
+            menu-model: menu_model;
+        };
+    }
+
+    Box launcher_container {
+        orientation: horizontal;
+    }
+
+    Label {
+      hexpand: true;
+    }
+
+    Box music_container {
+        orientation: horizontal;
+    }
+
+    Box clock_container {
+        orientation: horizontal;
+    }
+  }
+}
+
+menu menu_model {
+    section {
+        item {
+            label: "Sleep";
+            action: "app.sleep";
+        }
+        item {
+            label: "Restart";
+            action: "app.restart";
+        }
+        item {
+            label: "Shutdown";
+            action: "app.shutdown";
+        }
+    }
+}

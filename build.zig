@@ -3,14 +3,13 @@ const std = @import("std");
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
-    
+
     const gobject = b.dependency("gobject", .{
         .target = target,
         .optimize = optimize,
     });
 
     const zig_jsonc = b.dependency("zig_jsonc", .{});
-
 
     const mod = b.createModule(.{
         .root_source_file = b.path("src/main.zig"),
@@ -36,6 +35,21 @@ pub fn build(b: *std.Build) void {
 
     exe.root_module.addImport("zig_jsonc", zig_jsonc.module("zig_jsonc"));
 
+    const ui_dir_path = b.pathJoin(&.{ b.cache_root.path.?, "ui" });
+    const ui_cache_path = b.pathJoin(&.{ ui_dir_path, "system-bar.ui" });
+
+    const mkdir_ui = b.addSystemCommand(&.{ "mkdir", "-p", ui_dir_path });
+
+    const blueprint_compile = b.addSystemCommand(&.{
+        "blueprint-compiler",
+        "compile",
+        "src/ui/system-bar.blp",
+        "--output",
+        ui_cache_path,
+    });
+    blueprint_compile.step.dependOn(&mkdir_ui.step);
+    exe.step.dependOn(&blueprint_compile.step);
+
     const layer_shell_flags = b.run(&.{ "pkg-config", "--cflags", "--libs", "gtk4-layer-shell-0" });
     var layer_shell_flag_iter = std.mem.splitAny(u8, std.mem.trim(u8, layer_shell_flags, " \n\r\t"), " ");
     while (layer_shell_flag_iter.next()) |flag| {
@@ -47,6 +61,7 @@ pub fn build(b: *std.Build) void {
             exe.linkSystemLibrary(flag[2..]);
         }
     }
+
     b.installArtifact(exe);
 
     const exe_run = b.addRunArtifact(exe);

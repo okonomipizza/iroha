@@ -1,6 +1,6 @@
 const std = @import("std");
 const gtk = @import("gtk");
-const Config = @import("config.zig").Config;
+const Config = @import("config.zig");
 
 extern "c" fn gtk_layer_init_for_window(window: *anyopaque) void;
 extern "c" fn gtk_layer_set_layer(window: *anyopaque, layer: c_int) void;
@@ -41,5 +41,5 @@ pub fn setupLayerShell(window: *gtk.ApplicationWindow, config: *Config) void {
     setAnchor(window, GTK_LAYER_SHELL_EDGE_LEFT, true);
     setAnchor(window, GTK_LAYER_SHELL_EDGE_RIGHT, true);
 
-    setExclusiveZone(window, config.getExclusiveZone());
+    setExclusiveZone(window, config.bar.@"exclusive-zone");
 }
