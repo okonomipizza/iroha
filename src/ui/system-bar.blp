@@ -15,6 +15,35 @@ ApplicationWindow window {
 
     Box launcher_container {
         orientation: horizontal;
+            MenuButton launcher_button {
+                icon-name: "view-app-grid-symbolic";
+                styles ["launcher-icon-button"]
+                popover: Popover launcher_popover {
+                    styles ["launcher-popover"]
+                    Box launcher_popover_box {
+                        orientation: vertical;
+                        spacing: 8;
+                        margin-start: 12;
+                        margin-end: 12;
+                        margin-top: 12;
+                        margin-bottom: 12;
+                        
+                        ScrolledWindow launcher_scroll {
+                            min-content-width: 400;
+                            min-content-height: 300;
+                            max-content-height: 500;
+                            hscrollbar-policy: never;
+                            vscrollbar-policy: automatic;
+                            
+                            Grid launcher_grid {
+                              row-spacing: 12;
+                              column-spacing: 12;
+                              column-homogeneous: true;
+                            }
+                        }
+                    }
+                };
+            }
     }
 
     Label {
@@ -22,72 +51,38 @@ ApplicationWindow window {
     }
 
     Box music_container {
-        orientation: horizontal;
+      orientation: horizontal;
+      spacing: 8;
 
-        MenuButton music_button {
-            icon-name: "folder-music-symbolic";
-            
-            styles ["music-icon-button"]
+      Button music_play_pause_button {
+          halign: start;
+          valign: center;
+          styles ["music-play_pause_button"]
 
-            popover: Popover music_popover {
-                styles ["music-popover"]
+          Image music_play_pause_icon {
+            styles ["music-play_pause_button_icon"]
+          }
+      }
 
-                Box music_popover_box {
-                    orientation: vertical;
-                    spacing: 12;
-                    margin-start: 16;
-                    margin-end: 16;
-                    margin-top: 16;
-                    margin-bottom: 16;
+      ScrolledWindow music_scrolled_window {
+        hscrollbar-policy: automatic;
+        vscrollbar-policy: never;
+        styles ["music-scroll"]
 
-                    // Album art
-                    Image album_art {
-                      icon-name: "audio-x-generic";
-                      pixel-size: 300;
-                    }
-
-                    // Title label
-                    Label title_label {
-                      label: "No music palying";
-                      max-width-chars: 30;
-                      ellipsize: end;
-                      halign: center;
-                      styles ["music-title"]
-                    }
-
-                    Label artist_label {
-                      label: "";
-                      max-width-chars: 30;
-                      ellipsize: end;
-                      halign: center;
-                      styles ["music-artist"]
-                    }
-
-                    // Control buttons
-                    Box control_box {
-                      orientation: horizontal;
-                      spacing: 8;
-                      halign: center;
-                      
-                      Button prev_button {
-                        icon-name: "go-previous-symbolic";
-                        styles ["music-control-button"]
-                      }
-                      
-                      Button play_pause_button {
-                        icon-name: "media-playback-start";
-                        styles ["music-control-button"]
-                      }
-                      
-                      Button next_button {
-                        icon-name: "go-next-symbolic";
-                        styles ["music-control-button"]
-                      }
-                    }
-
-                }
-            };
+        Box music_scrolled_title_box {
+            orientation: horizontal;
+            spacing: 10;
+            Label music_scrolled_label {
+                label: "No music playing";
+                ellipsize: none;
+                single-line-mode: true;
+            }
         }
+
+      }
+
+
+
     }
 
     Box clock_container {

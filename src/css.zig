@@ -130,6 +130,10 @@ pub fn generateCss(allocator: std.mem.Allocator, config: *const Config) ![:0]con
         \\.music-control-button:hover {
         \\  background-color: rgba(255, 255, 255, 0.15);
         \\}
+        \\
+        \\scrolledwindow.music-scroll scrollbar {
+        \\  opacity: 0;
+        \\}
         // \\
         // \\/* Menu items */
         // \\popover.menu modelbutton {

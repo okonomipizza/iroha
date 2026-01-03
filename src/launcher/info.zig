@@ -14,7 +14,7 @@ pub const AppEntry = struct {
     const Self = @This();
 
     pub fn launch(self: *const AppEntry) void {
-        _ = self.app_info.launch(self.app_info, null, null);
+        _ = self.app_info.launch(null, null, null);
     }
 
     pub fn createWidget(self: *const Self) *gtk.Button {
@@ -65,7 +65,7 @@ pub const AppEntry = struct {
         return button;
     }
 
-    fn onButtonDestroy(button: *gtk.Button, user_data: ?*anyopaque) callconv(.c) void {
+    pub fn onButtonDestroy(button: *gtk.Button, user_data: ?*anyopaque) callconv(.c) void {
         _ = user_data;
         const UserData = struct {
             app_info: *gio.AppInfo,
@@ -80,7 +80,7 @@ pub const AppEntry = struct {
         }
     }
 
-    fn onAppButtonClicked(button: *gtk.Button, user_data: ?*anyopaque) callconv(.c) void {
+    pub fn onAppButtonClicked(button: *gtk.Button, user_data: ?*anyopaque) callconv(.c) void {
         _ = user_data;
 
         const UserData = struct {
