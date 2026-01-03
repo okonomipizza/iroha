@@ -113,28 +113,58 @@ ZON_EOF
       runHook preBuild
 
       zig build \
-        --prefix $TMPDIR/install \
+        --prefix $out \
         -Doptimize=${optimize} \
         --verbose
 
       runHook postBuild
     '';
 
-    installPhase = ''
+installPhase = ''
       runHook preInstall
 
-      mkdir -p $out/bin
-      if [ -f "$TMPDIR/install/bin/iroha" ]; then
-        cp $TMPDIR/install/bin/iroha $out/bin/iroha
-        chmod +x $out/bin/iroha
-      else
-        echo "Error: Binary not found at $TMPDIR/install/bin/iroha"
+      # zig buildが既に$outにインストール済み
+      # ファイルの存在確認のみ
+      if [ ! -f "$out/bin/iroha" ]; then
+        echo "Error: Binary not found at $out/bin/iroha"
+        echo "Contents of $out:"
+        find $out -type f
         exit 1
       fi
 
+      if [ ! -f "$out/share/iroha/ui/system-bar.ui" ]; then
+        echo "Error: UI file not found at $out/share/iroha/ui/system-bar.ui"
+        echo "Contents of $out/share:"
+        find $out/share -type f 2>/dev/null || echo "share directory not found"
+        exit 1
+      fi
+
+      echo "Build artifacts installed successfully:"
+      echo "Binary: $out/bin/iroha"
+      echo "UI file: $out/share/iroha/ui/system-bar.ui"
+
       runHook postInstall
     '';
-
+    # installPhase = ''
+    #   runHook preInstall
+    #
+    #   mkdir -p $out/bin
+    #   if [ -f "$TMPDIR/install/bin/iroha" ]; then
+    #     cp $TMPDIR/install/bin/iroha $out/bin/iroha
+    #     chmod +x $out/bin/iroha
+    #   else
+    #     echo "Error: Binary not found at $TMPDIR/install/bin/iroha"
+    #     exit 1
+    #   fi
+    #
+    #   runHook postInstall
+    # '';
+postFixup = ''
+      # XDG_DATA_DIRSを設定
+      wrapProgram $out/bin/iroha \
+        --prefix XDG_DATA_DIRS : "$out/share" \
+        ''${gappsWrapperArgs[@]}
+    '';
     meta = {
       description = "GTK4 Layer Shell status bar application written in Zig";
       homepage = "https://github.com/okonomipizza/iroha";

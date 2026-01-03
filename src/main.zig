@@ -308,9 +308,10 @@ fn onShutdown(_: *gio.SimpleAction, _: ?*glib.Variant, _: ?*anyopaque) callconv(
 fn getUIPath(allocator: std.mem.Allocator) ![]const u8 {
     // Try multiple possible locations
     const possible_paths = [_][]const u8{
-        "zig-out/ui/system-bar.ui", // Development build
-        "/usr/share/iroha/ui/system-bar.ui", // System install
-        "/nix/store/.../share/iroha/ui/system-bar.ui", // Nix (via XDG_DATA_DIRS)
+        "zig-out/ui/system-bar.ui", // zig build run
+        "zig-out/share/iroha/ui/system-bar.ui", // local install
+        "/usr/share/iroha/ui/system-bar.ui", // system install
+        "/usr/local/share/iroha/ui/system-bar.ui",
     };
 
     // First try direct paths

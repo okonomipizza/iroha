@@ -9,8 +9,6 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    const zig_jsonc = b.dependency("zig_jsonc", .{});
-
     const mod = b.createModule(.{
         .root_source_file = b.path("src/main.zig"),
         .target = target,
@@ -32,20 +30,26 @@ pub fn build(b: *std.Build) void {
         .name = "iroha",
         .root_module = mod,
     });
+
+    const zig_jsonc = b.dependency("zig_jsonc", .{});
     exe.root_module.addImport("zig_jsonc", zig_jsonc.module("zig_jsonc"));
 
-    const blueprint_compile = b.addSystemCommand(&.{
-        "sh",
-        "-c",
-        "mkdir -p zig-out/ui && blueprint-compiler compile --output zig-out/ui/system-bar.ui src/ui/system-bar.blp",
+    const blueprint_cmd = b.addSystemCommand(&.{
+        "blueprint-compiler",
+        "compile",
+        "--output",
     });
+    const ui_output = blueprint_cmd.addOutputFileArg("system-bar.ui");
+    blueprint_cmd.addFileArg(b.path("src/ui/system-bar.blp"));
 
-    exe.step.dependOn(&blueprint_compile.step);
+    // For dev
+    const install_dev_ui = b.addInstallFile(ui_output, "ui/system-bar.ui");
 
-    const ui_file = b.path("zig-out/ui/system-bar.ui");
-    const install_ui = b.addInstallFile(ui_file, "share/iroha/ui/system-bar.ui");
-    install_ui.step.dependOn(&blueprint_compile.step);
-    b.getInstallStep().dependOn(&install_ui.step);
+    // For production
+    const install_prod_ui = b.addInstallFile(ui_output, "share/iroha/ui/system-bar.ui");
+
+    b.getInstallStep().dependOn(&install_dev_ui.step);
+    b.getInstallStep().dependOn(&install_prod_ui.step);
 
     const layer_shell_flags = b.run(&.{ "pkg-config", "--cflags", "--libs", "gtk4-layer-shell-0" });
     var layer_shell_flag_iter = std.mem.splitAny(u8, std.mem.trim(u8, layer_shell_flags, " \n\r\t"), " ");
