@@ -30,6 +30,61 @@ pub fn generateCss(allocator: std.mem.Allocator, config: *const Config) ![:0]con
         config.bar.height,
     });
 
+    try buffer.writer.print(
+        \\menubutton {{
+        \\  padding: 4px 8px;
+        \\  border-radius: 6px;
+        \\  background: transparent;
+        \\  transition: all 200ms ease;
+        \\}}
+        \\
+        \\menubutton:hover {{
+        \\  background-color: rgba(255, 255, 255, 0.1);
+        \\}}
+        \\
+        \\menubutton:active {{
+        \\  background-color: rgba(255, 255, 255, 0.15);
+        \\}}
+        \\
+    , .{});
+
+    // Mac-style PopoverMenu
+    try buffer.writer.print(
+        \\/* Popover container */
+        \\popover.menu {{
+        \\  background-color: {s};
+        \\  border-radius: 8px;
+        \\  padding: 4px;
+        \\  border: none;
+        \\}}
+        \\
+        \\/* Popover contents wrapper */
+        \\popover.menu > contents {{
+        \\  background: transparent;
+        \\  padding: 0;
+        \\  box-shadow: none;
+        \\  border: none;
+        \\}}
+        \\
+        \\/* Menu items */
+        \\popover.menu modelbutton {{
+        \\  min-height: 24px;
+        \\  padding: 6px 12px;
+        \\  border-radius: 4px;
+        \\  background: transparent;
+        \\  color: {s};
+        \\  transition: all 150ms ease;
+        \\  box-shadow: none;
+        \\}}
+        \\
+        \\popover.menu modelbutton:hover {{
+        \\  background-color: rgba(255, 255, 255, 0.12);
+        \\}}
+        \\
+    , .{
+        config.theme.background,
+        config.theme.foreground,
+    });
     // Global font settings
     try buffer.writer.print(
         \\* {{
@@ -67,40 +122,6 @@ pub fn generateCss(allocator: std.mem.Allocator, config: *const Config) ![:0]con
         config.theme.@"clock-color",
     });
 
-    // Mac-style PopoverMenu
-    try buffer.writer.writeAll(
-        \\/* Popover container */
-        \\popover.menu {
-        \\  background-color: rgba(40, 40, 50, 0.95);
-        \\  border-radius: 8px;
-        \\  padding: 2px 6px;
-        \\}
-        \\
-        \\/* Popover contents wrapper */
-        \\popover.menu > contents {
-        \\  background: transparent;
-        \\  padding: 0;
-        \\  box-shadow: none;
-        \\  border: none;
-        \\}
-        \\
-        \\/* Menu items */
-        \\popover.menu modelbutton {
-        \\  min-height: 10px;
-        \\  padding: 1px 10px;
-        \\  border-radius: 4px;
-        \\  background: transparent;
-        \\  color: #cdd6f4;
-        \\  transition: all 150ms ease;
-        \\  box-shadow: none;
-        \\}
-        \\
-        \\popover.menu modelbutton:hover {
-        \\ background-color: rgba(137, 180, 250, 0.2);
-        \\}
-        \\
-    );
-
     try buffer.writer.print(
         \\/* Music control buttons */
         \\.music_container {{
@@ -116,6 +137,90 @@ pub fn generateCss(allocator: std.mem.Allocator, config: *const Config) ![:0]con
     , .{
         config.theme.background_darker,
     });
+
+    try buffer.writer.print(
+        \\.launcheer-icon-button {{
+        \\  padding: 0 8px;
+        \\}}
+        \\
+        \\/* Launcheer popover */
+        \\popover.launcher-popover {{
+        \\  background: {s};
+        \\  padding: 0;
+        \\  border: none;
+        \\  border-radius: 0;
+        \\}}
+        \\
+        \\popover.launcher-popover > contents {{
+        \\  background: transparent;
+        \\  padding: 0;
+        \\  border: none;
+        \\  border-radius: 0;
+        \\}}
+        \\
+        \\popover.launcher-popover box {{
+        \\  background: {s};
+        \\  border: none;
+        \\}}
+        \\ 
+        \\popover.launcher-popover scrolledwindow {{
+        \\  background: {s};
+        \\  border: none;
+        \\}}
+        \\
+        \\popover.launcher-popover scrolledwindow scrollbar {{
+        \\  opacity: 0;
+        \\}}
+        \\
+        \\popover.launcher-popover scrolledwindow undershoot.top,
+        \\popover.launcher-popover scrolledwindow undershoot.bottom,
+        \\popover.launcher-popover scrolledwindow undershoot.left,
+        \\popover.launcher-popover scrolledwindow undershoot.right,
+        \\popover.launcher-popover scrolledwindow overshoot.top,
+        \\popover.launcher-popover scrolledwindow overshoot.bottom,
+        \\popover.launcher-popover scrolledwindow overshoot.left,
+        \\popover.launcher-popover scrolledwindow overshoot.right {{
+        \\  background: none;
+        \\}}
+        \\
+        \\popover.launcher-popover scrolledwindow > undershoot {{
+        \\  background: none;
+        \\}}
+        \\
+        \\popover.launcher-popover grid {{
+        \\  background: {s};
+        \\}}
+        \\
+        // \\/* Launcher app buttons */
+        // \\.launcher-app-button {{
+        // \\  padding: 8px;
+        // \\  border-radius: 8px;
+        // \\  background: transparent;
+        // \\  transition: all 200ms ease;
+        // \\}}
+        // \\
+        // \\.launcher-app-button:hover {{
+        // \\  background-color: rgba(255, 255, 255, 0.1);
+        // \\  transform: scale(1.05);
+        // \\}}
+        // \\
+        // \\.launcher-app-button:active {{
+        // \\  background-color: rgba(255, 255, 255, 0.15);
+        // \\  transform: scale(0.98);
+        // \\}}
+        // \\
+        // \\.launcher-app-button label {{
+        // \\  color: {s};
+        // \\  font-size: 11pt;
+        // \\}}
+        // \\
+    , .{
+        config.theme.background,
+        config.theme.background,
+        config.theme.background,
+        config.theme.background,
+    });
+
     return try buffer.toOwnedSliceSentinel(0);
 }
 

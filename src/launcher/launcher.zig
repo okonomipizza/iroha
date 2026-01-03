@@ -8,51 +8,42 @@ const AppEntry = @import("info.zig").AppEntry;
 
 const info = @import("./info.zig");
 
-pub const Launcher = extern struct {
-    parent_instance: Parent,
+pub const Launcher = struct {
+    allocator: std.mem.Allocator,
 
-    pub const Parent = gtk.Widget;
+    apps: ?std.ArrayList(info.AppEntry),
+
+    container: *gtk.Box,
+    button: *gtk.MenuButton,
+    popover: *gtk.Popover,
+    app_box: *gtk.Box,
+    scrolled_window: *gtk.ScrolledWindow,
+    grid: *gtk.Grid,
+
     const Self = @This();
 
-    const Private = struct {
-        launcher_button: ?*gtk.MenuButton,
-        launcher_popover: ?*gtk.Popover,
-        launcher_grid: ?*gtk.Grid,
-        // scrolled_window: ?*gtk.ScrolledWindow,
-        // app_box: ?*gtk.Box,
-        apps: ?std.ArrayList(info.AppEntry),
-        allocator: ?std.mem.Allocator,
-
-        var offset: c_int = 0;
-    };
-
-    pub const getGObjectType = gobject.ext.defineClass(Self, .{
-        .name = "IrohaLauncher",
-        .instanceInit = &init,
-        .classInit = &Class.init,
-        .parent_class = &Class.parent,
-        .private = .{ .Type = Private, .offset = &Private.offset },
-    });
-
-    pub fn new(
+    pub fn init(
         allocator: std.mem.Allocator,
-        launcher_button: *gtk.MenuButton,
-        launcher_popover: *gtk.Popover,
-        launcher_grid: *gtk.Grid,
+        container: *gtk.Box,
+        button: *gtk.MenuButton,
+        popover: *gtk.Popover,
+        app_box: *gtk.Box,
+        scrolled_window: *gtk.ScrolledWindow,
+        grid: *gtk.Grid,
     ) !*Self {
-        var launcher = gobject.ext.newInstance(Self, .{});
-        const priv = launcher.private();
-
-        priv.launcher_button = launcher_button;
-        priv.launcher_popover = launcher_popover;
-        priv.launcher_grid = launcher_grid;
-        priv.allocator = allocator;
-
-        // const style_context = gtk.Widget.getStyleContext(launcher.as(gtk.Widget));
-        // gtk.StyleContext.addClass(style_context, "launcher");
-
+        const launcher = try allocator.create(Self);
         var apps = try info.getAllApplications(allocator);
-        priv.apps = apps;
+
+        launcher.* = .{
+            .allocator = allocator,
+            .apps = apps,
+            .container = container,
+            .button = button,
+            .popover = popover,
+            .app_box = app_box,
+            .scrolled_window = scrolled_window,
+            .grid = grid,
+        };
 
         const data_manager = try AppLauncheDataManager.init(allocator);
         defer data_manager.deinit();
@@ -65,8 +56,8 @@ pub const Launcher = extern struct {
         var col: c_int = 0;
 
         for (apps.items) |*app| {
-            const button = createAppButton(app);
-            launcher_grid.attach(button.as(gtk.Widget), col, row, 1, 1);
+            const app_button = createAppButton(app);
+            grid.attach(app_button.as(gtk.Widget), col, row, 1, 1);
 
             col += 1;
             if (col >= columns) {
@@ -74,14 +65,8 @@ pub const Launcher = extern struct {
                 row += 1;
             }
         }
-        // if (priv.app_box) |app_box| {
-        //     sortAppOrder(data_manager, &apps);
-        //     // Add app launch buttons
-        //     for (apps.items) |*app| {
-        //         const widget = app.createWidget();
-        //         app_box.append(widget.as(gtk.Widget));
-        //     }
-        // }
+
+        gtk.Popover.setHasArrow(popover, 0);
 
         return launcher;
     }
@@ -146,59 +131,8 @@ pub const Launcher = extern struct {
         gtk.StyleContext.addClass(style_context, "launcher-app-button");
 
         return button;
-        // const button = gtk.Button.new();
-        //
-        // const box = gtk.Box.new(.horizontal, 8);
-        // button.setChild(box.as(gtk.Widget));
-        //
-        // // Icon
-        // if (app.icon) |icon_name| {
-        //     if (icon_name.toString()) |name| {
-        //         const icon = gtk.Image.newFromIconName(name);
-        //         gtk.Image.setPixelSize(icon, 32);
-        //         box.append(icon.as(gtk.Widget));
-        //     }
-        // }
-        //
-        // // Label
-        // const label = gtk.Label.new(app.name);
-        // gtk.Label.setXalign(label, 0.0);
-        // gtk.Widget.setHexpand(label.as(gtk.Widget), 1);
-        // box.append(label.as(gtk.Widget));
-        //
-        // // Connect click signal
-        // _ = gtk.Button.signals.clicked.connect(
-        //     button,
-        //     *AppEntry,
-        //     &onAppButtonClicked,
-        //     app,
-        //     .{},
-        // );
-        //
-        // const style_context = gtk.Widget.getStyleContext(button.as(gtk.Widget));
-        // gtk.StyleContext.addClass(style_context, "launcher-app-button");
-        //
-        // return button;
     }
 
-    // fn onAppButtonClicked(button: *gtk.Button, app: *AppEntry) callconv(.c) void {
-    //     _ = button;
-    //     app.launch();
-    // }
-
-    /// Sorts the app list based on launch frequency
-    ///
-    /// Reorders the app list according to the launch statistics stored in data_manager.
-    /// App that have been launched more recently or frequently appear first in the sorted list.
-    /// The order in data_manager.stats determines the priority, and the apps list is rearranged
-    /// to match that order.
-    ///
-    /// Parameters:
-    ///   - data_manager: Manager containing app launch statistics
-    ///   - apps: List ot app entries to be sorted (modified in place)
-    ///
-    /// Note:
-    ///   - Apps not present in data_manager remain at the end of the list
     fn sortAppOrder(data_manager: *AppLauncheDataManager, apps: *std.ArrayList(AppEntry)) void {
         var i: usize = 0;
         while (i < data_manager.length()) : (i += 1) {
@@ -216,113 +150,4 @@ pub const Launcher = extern struct {
             }
         }
     }
-
-    pub fn as(clock: *Self, comptime T: type) *T {
-        return gobject.ext.as(T, clock);
-    }
-
-    fn init(self: *Self, _: *Class) callconv(.c) void {
-        const priv = self.private();
-        priv.launcher_button = null;
-        priv.launcher_popover = null;
-        priv.launcher_grid = null;
-        priv.apps = null;
-        priv.allocator = null;
-        // const priv = self.private();
-        //
-        // const scrolled = gtk.ScrolledWindow.new();
-        // scrolled.setPolicy(.automatic, .never); // Only scrollable horizontal
-        //
-        // scrolled.setMinContentHeight(40);
-        // scrolled.setMaxContentHeight(40);
-        //
-        // scrolled.setMinContentWidth(300);
-        //
-        // const widget = self.as(gtk.Widget);
-        //
-        // const bin_layout = gtk.BinLayout.new();
-        // const layout_manager: *gtk.LayoutManager = @ptrCast(@alignCast(bin_layout));
-        // widget.setLayoutManager(layout_manager);
-        //
-        // gtk.Widget.setParent(scrolled.as(gtk.Widget), widget);
-        //
-        // priv.scrolled_window = scrolled;
-        // priv.apps = null;
-        // priv.allocator = null;
-        //
-        // const box = gtk.Box.new(.horizontal, 8);
-        // scrolled.setChild(box.as(gtk.Widget));
-        //
-        // priv.app_box = box;
-    }
-
-    fn dispose(self: *Self) callconv(.c) void {
-        const priv = self.private();
-
-        if (priv.apps) |*apps| {
-            if (priv.allocator) |a| {
-                apps.deinit(a);
-            }
-            priv.apps = null;
-        }
-
-        priv.launcher_button = null;
-        priv.launcher_popover = null;
-        priv.launcher_grid = null;
-        priv.allocator = null;
-
-        gobject.Object.virtual_methods.dispose.call(Class.parent, self.as(Parent));
-        // const priv = self.private();
-        //
-        // const allocator = priv.allocator orelse return;
-        //
-        // if (priv.apps) |*apps| {
-        //     for (apps.items) |*app| {
-        //         _ = app;
-        //     }
-        //     apps.deinit(allocator);
-        //     priv.apps = null;
-        // }
-        //
-        // if (priv.scrolled_window) |scrolled| {
-        //     gtk.Widget.unparent(scrolled.as(gtk.Widget));
-        //     priv.scrolled_window = null;
-        // }
-        //
-        // priv.app_box = null;
-        // priv.allocator = null;
-        //
-        // gobject.Object.virtual_methods.dispose.call(Class.parent, self.as(Parent));
-    }
-
-    fn private(self: *Self) *Private {
-        return gobject.ext.impl_helpers.getPrivate(self, Private, Private.offset);
-    }
-
-    pub const Class = extern struct {
-        parent_class: Parent.Class,
-        var parent: *Parent.Class = undefined;
-        pub const Instance = Self;
-
-        pub fn as(class: *Class, comptime T: type) *T {
-            return gobject.ext.as(T, class);
-        }
-
-        fn init(class: *Class) callconv(.c) void {
-            gobject.Object.virtual_methods.dispose.implement(class, &dispose);
-        }
-        // parent_class: Parent.Class,
-        //
-        // var parent: *Parent.Class = undefined;
-        //
-        // pub const Instance = Self;
-        //
-        // pub fn as(class: *Class, comptime T: type) *T {
-        //     return gobject.ext.as(T, class);
-        // }
-        //
-        // fn init(class: *Class) callconv(.c) void {
-        //     gobject.Object.virtual_methods.dispose.implement(class, &dispose);
-        // }
-    };
 };

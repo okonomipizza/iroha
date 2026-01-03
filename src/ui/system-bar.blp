@@ -23,11 +23,10 @@ ApplicationWindow window {
                     Box launcher_popover_box {
                         orientation: vertical;
                         spacing: 8;
-                        margin-start: 12;
-                        margin-end: 12;
-                        margin-top: 12;
-                        margin-bottom: 12;
-                        
+                    margin-start: 12;
+                    margin-end: 12;
+                    margin-top: 12;
+                    margin-bottom: 12;
                         ScrolledWindow launcher_scroll {
                             min-content-width: 400;
                             min-content-height: 300;
@@ -36,8 +35,8 @@ ApplicationWindow window {
                             vscrollbar-policy: automatic;
                             
                             Grid launcher_grid {
-                              row-spacing: 12;
-                              column-spacing: 12;
+                              row-spacing: 20;
+                              column-spacing: 20;
                               column-homogeneous: true;
                             }
                         }
@@ -79,13 +78,8 @@ ApplicationWindow window {
                 single-line-mode: true;
             }
         }
-
       }
-
-
-
     }
-
     Box clock_container {
         orientation: horizontal;
     }
