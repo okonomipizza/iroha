@@ -16,6 +16,7 @@
   wayland-protocols,
   wayland-scanner,
   autoPatchelfHook,
+  blueprint-compiler,
   revision ? "dirty",
   optimize ? "Debug",
 }: let
@@ -47,6 +48,7 @@ in
       wayland-scanner
       wayland-protocols
       autoPatchelfHook
+      blueprint-compiler
     ];
 
     buildInputs = [

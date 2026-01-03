@@ -61,7 +61,19 @@ fn activate(app: *gtk.Application, user_data: ?*anyopaque) callconv(.c) void {
             std.posix.exit(1);
         };
 
-        const builder = gtk.Builder.newFromFile(".zig-cache/ui/system-bar.ui");
+        const ui_path = getUIPath(allocator) catch |err| {
+            std.debug.print("Failed to find UI file: {}\n", .{err});
+            std.posix.exit(1);
+        };
+        defer allocator.free(ui_path);
+
+        const ui_path_z = allocator.dupeZ(u8, ui_path) catch |err| {
+            std.debug.print("Failed to allocate UI path: {}\n", .{err});
+            std.posix.exit(1);
+        };
+        defer allocator.free(ui_path_z);
+
+        const builder = gtk.Builder.newFromFile(ui_path_z.ptr);
         defer builder.unref();
 
         const window_obj = gtk.Builder.getObject(builder, "window") orelse {
@@ -294,9 +306,29 @@ fn onShutdown(_: *gio.SimpleAction, _: ?*glib.Variant, _: ?*anyopaque) callconv(
 }
 
 fn getUIPath(allocator: std.mem.Allocator) ![]const u8 {
-    const cache_path = ".zig-cache/ui/system-bar.ui";
-    if (std.fs.cwd().access(cache_path, .{})) {
-        return try allocator.dupe(u8, cache_path);
+    // Try multiple possible locations
+    const possible_paths = [_][]const u8{
+        "zig-out/ui/system-bar.ui", // Development build
+        "/usr/share/iroha/ui/system-bar.ui", // System install
+        "/nix/store/.../share/iroha/ui/system-bar.ui", // Nix (via XDG_DATA_DIRS)
+    };
+
+    // First try direct paths
+    for (possible_paths) |path| {
+        std.fs.cwd().access(path, .{}) catch continue;
+        return try allocator.dupe(u8, path);
+    }
+
+    // Try XDG_DATA_DIRS
+    if (std.posix.getenv("XDG_DATA_DIRS")) |data_dirs| {
+        var iter = std.mem.splitAny(u8, data_dirs, ":");
+        while (iter.next()) |dir| {
+            const path = try std.fs.path.join(allocator, &.{ dir, "iroha", "ui", "system-bar.ui" });
+            defer allocator.free(path);
+
+            std.fs.cwd().access(path, .{}) catch continue;
+            return try allocator.dupe(u8, path);
+        }
     }
 
     return error.UIFileNotFound;
@@ -326,67 +358,3 @@ pub fn main() !void {
     );
     std.process.exit(@intCast(status));
 }
-
-// MenuButton music_button {
-//     icon-name: "folder-music-symbolic";
-//
-//     styles ["music-icon-button"]
-//
-//     popover: Popover music_popover {
-//         styles ["music-popover"]
-//
-//         Box music_popover_box {
-//             orientation: vertical;
-//             spacing: 12;
-//             margin-start: 16;
-//             margin-end: 16;
-//             margin-top: 16;
-//             margin-bottom: 16;
-//
-//             // Album art
-//             Image album_art {
-//               icon-name: "audio-x-generic";
-//               pixel-size: 300;
-//             }
-//
-//             // Title label
-//             Label title_label {
-//               label: "No music palying";
-//               max-width-chars: 30;
-//               ellipsize: end;
-//               halign: center;
-//               styles ["music-title"]
-//             }
-//
-//             Label artist_label {
-//               label: "";
-//               max-width-chars: 30;
-//               ellipsize: end;
-//               halign: center;
-//               styles ["music-artist"]
-//             }
-//
-//             // Control buttons
-//             Box control_box {
-//               orientation: horizontal;
-//               spacing: 8;
-//               halign: center;
-//
-//               Button prev_button {
-//                 icon-name: "go-previous-symbolic";
-//                 styles ["music-control-button"]
-//               }
-//
-//               Button play_pause_button {
-//                 icon-name: "media-playback-start";
-//                 styles ["music-control-button"]
-//               }
-//
-//               Button next_button {
-//                 icon-name: "go-next-symbolic";
-//                 styles ["music-control-button"]
-//               }
-//             }
-//
-//         }
-//     };

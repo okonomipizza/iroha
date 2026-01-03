@@ -32,21 +32,20 @@ pub fn build(b: *std.Build) void {
         .name = "iroha",
         .root_module = mod,
     });
-
     exe.root_module.addImport("zig_jsonc", zig_jsonc.module("zig_jsonc"));
-
-    // const ui_dir_path = b.pathJoin(&.{ b.cache_root.path.?, "ui" });
-    // const ui_cache_path = b.pathJoin(&.{ ui_dir_path, "system-bar.ui" });
-
-    // const mkdir_ui = b.addSystemCommand(&.{ "mkdir", "-p", ui_dir_path });
 
     const blueprint_compile = b.addSystemCommand(&.{
         "sh",
         "-c",
-        "mkdir -p .zig-cache/ui && blueprint-compiler compile --output .zig-cache/ui/system-bar.ui src/ui/system-bar.blp",
+        "mkdir -p zig-out/ui && blueprint-compiler compile --output zig-out/ui/system-bar.ui src/ui/system-bar.blp",
     });
 
     exe.step.dependOn(&blueprint_compile.step);
+
+    const ui_file = b.path("zig-out/ui/system-bar.ui");
+    const install_ui = b.addInstallFile(ui_file, "share/iroha/ui/system-bar.ui");
+    install_ui.step.dependOn(&blueprint_compile.step);
+    b.getInstallStep().dependOn(&install_ui.step);
 
     const layer_shell_flags = b.run(&.{ "pkg-config", "--cflags", "--libs", "gtk4-layer-shell-0" });
     var layer_shell_flag_iter = std.mem.splitAny(u8, std.mem.trim(u8, layer_shell_flags, " \n\r\t"), " ");
