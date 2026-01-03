@@ -8,47 +8,16 @@ pub fn generateCss(allocator: std.mem.Allocator, config: *const Config) ![:0]con
     var buffer = std.Io.Writer.Allocating.init(allocator);
     defer buffer.deinit();
 
-    // Window style
-    try buffer.writer.print(
-        \\window {{
-        \\  background-color: {s};
-        \\  color: {s};
-        \\  padding: {d}px {d}px {d}px {d}px;
-        \\}}
-        \\
-        \\#main_box {{
-        \\  min-height: {d}px;
-        \\}}
-        \\
-    , .{
-        config.theme.background,
-        config.theme.foreground,
-        config.bar.margin.top,
-        config.bar.margin.right,
-        config.bar.margin.bottom,
-        config.bar.margin.left,
-        config.bar.height,
-    });
+    // === Window & Layout ===
+    try writeWindowStyles(&buffer, config);
 
-    try buffer.writer.print(
-        \\menubutton {{
-        \\  padding: 4px 8px;
-        \\  border-radius: 6px;
-        \\  background: transparent;
-        \\  transition: all 200ms ease;
-        \\}}
-        \\
-        \\menubutton:hover {{
-        \\  background-color: rgba(255, 255, 255, 0.1);
-        \\}}
-        \\
-        \\menubutton:active {{
-        \\  background-color: rgba(255, 255, 255, 0.15);
-        \\}}
-        \\
-    , .{});
+    // === Typography ===
+    try writeFontStyles(&buffer, config);
 
-    // Mac-style PopoverMenu
+    // === Buttons ===
+    try writeButtonStyles(&buffer, config);
+
+    // === Popovers ===
     try buffer.writer.print(
         \\/* Popover container */
         \\popover.menu {{
@@ -85,8 +54,41 @@ pub fn generateCss(allocator: std.mem.Allocator, config: *const Config) ![:0]con
         config.theme.background,
         config.theme.foreground,
     });
-    // Global font settings
+
+    try writeMusicStyles(&buffer, config);
+    try writeLauncherPopoverStyles(&buffer, config);
+
+    return try buffer.toOwnedSliceSentinel(0);
+}
+
+fn writeWindowStyles(buffer: *std.Io.Writer.Allocating, config: *const Config) !void {
     try buffer.writer.print(
+        \\/* === Window & Layout === */
+        \\window {{
+        \\  background-color: {s};
+        \\  color: {s};
+        \\  padding: {d}px {d}px {d}px {d}px;
+        \\}}
+        \\
+        \\#main_box {{
+        \\  min-height: {d}px;
+        \\}}
+        \\
+        \\
+    , .{
+        config.theme.background,
+        config.theme.foreground,
+        config.bar.margin.top,
+        config.bar.margin.right,
+        config.bar.margin.bottom,
+        config.bar.margin.left,
+        config.bar.height,
+    });
+}
+
+fn writeFontStyles(buffer: *std.Io.Writer.Allocating, config: *const Config) !void {
+    try buffer.writer.print(
+        \\/* === Typography === */
         \\* {{
         \\  font-family: {s};
         \\  font-size: {d}pt;
@@ -96,14 +98,17 @@ pub fn generateCss(allocator: std.mem.Allocator, config: *const Config) ![:0]con
         \\  color: {s};
         \\}}
         \\
+        \\
     , .{
         config.theme.@"font-family",
         config.theme.@"font-size",
-        config.theme.@"clock-color",
+        config.theme.foreground,
     });
+}
 
-    // Button styles (Clock, Menu buttons)
+fn writeButtonStyles(buffer: *std.Io.Writer.Allocating, config: *const Config) !void {
     try buffer.writer.print(
+        \\/* === Base Button Styles === */
         \\button {{
         \\  padding: 0 4px;
         \\  min-height: 0;
@@ -118,12 +123,93 @@ pub fn generateCss(allocator: std.mem.Allocator, config: *const Config) ![:0]con
         \\  background-color: rgba(255, 255, 255, 0.1);
         \\}}
         \\
+        \\button:active {{
+        \\  background-color: rgba(255, 255, 255, 0.15);
+        \\}}
+        \\
+        \\
     , .{
-        config.theme.@"clock-color",
+        config.theme.foreground,
     });
+}
 
+fn writeLauncherPopoverStyles(buffer: *std.Io.Writer.Allocating, config: *const Config) !void {
     try buffer.writer.print(
-        \\/* Music control buttons */
+        \\/* === Launcher Popover === */
+        \\popover.launcher-popover {{
+        \\  background: {s};
+        \\  padding: 0;
+        \\  border: none;
+        \\  border-radius: 8px;
+        \\}}
+        \\
+        \\popover.launcher-popover > contents {{
+        \\  background: transparent;
+        \\  padding: 0;
+        \\  border: none;
+        \\}}
+        \\
+        \\/* Launcher content box */
+        \\popover.launcher-popover box {{
+        \\  background: {s};
+        \\  border: none;
+        \\}}
+        \\
+        \\/* Launcher scrolled window */
+        \\popover.launcher-popover scrolledwindow {{
+        \\  background: {s};
+        \\  border: none;
+        \\}}
+        \\
+        \\popover.launcher-popover scrolledwindow scrollbar {{
+        \\  opacity: 0;
+        \\}}
+        \\
+        \\/* Remove scroll effects */
+        \\popover.launcher-popover scrolledwindow undershoot,
+        \\popover.launcher-popover scrolledwindow overshoot {{
+        \\  background: none;
+        \\}}
+        \\
+        \\/* Launcher grid */
+        \\popover.launcher-popover grid {{
+        \\  background: {s};
+        \\}}
+        \\
+        \\/* Launcher app buttons */
+        \\.launcher-app-button {{
+        \\  padding: 8px;
+        \\  border-radius: 8px;
+        \\  background: transparent;
+        \\  transition: all 200ms ease;
+        \\}}
+        \\
+        \\.launcher-app-button:hover {{
+        \\  background-color: rgba(255, 255, 255, 0.1);
+        \\}}
+        \\
+        \\.launcher-app-button:active {{
+        \\  background-color: rgba(255, 255, 255, 0.15);
+        \\}}
+        \\
+        \\.launcher-app-button label {{
+        \\  color: {s};
+        \\  font-size: 11pt;
+        \\}}
+        \\
+        \\
+    , .{
+        config.theme.background,
+        config.theme.background,
+        config.theme.background,
+        config.theme.background,
+        config.theme.foreground,
+    });
+}
+
+fn writeMusicStyles(buffer: *std.Io.Writer.Allocating, config: *const Config) !void {
+    try buffer.writer.print(
+        \\/* === Music Widget === */
         \\.music_container {{
         \\  background: {s};
         \\  border-radius: 6px;
@@ -134,94 +220,10 @@ pub fn generateCss(allocator: std.mem.Allocator, config: *const Config) ![:0]con
         \\  opacity: 0;
         \\}}
         \\
+        \\
     , .{
         config.theme.background_darker,
     });
-
-    try buffer.writer.print(
-        \\.launcheer-icon-button {{
-        \\  padding: 0 8px;
-        \\}}
-        \\
-        \\/* Launcheer popover */
-        \\popover.launcher-popover {{
-        \\  background: {s};
-        \\  padding: 0;
-        \\  border: none;
-        \\  border-radius: 0;
-        \\}}
-        \\
-        \\popover.launcher-popover > contents {{
-        \\  background: transparent;
-        \\  padding: 0;
-        \\  border: none;
-        \\  border-radius: 0;
-        \\}}
-        \\
-        \\popover.launcher-popover box {{
-        \\  background: {s};
-        \\  border: none;
-        \\}}
-        \\ 
-        \\popover.launcher-popover scrolledwindow {{
-        \\  background: {s};
-        \\  border: none;
-        \\}}
-        \\
-        \\popover.launcher-popover scrolledwindow scrollbar {{
-        \\  opacity: 0;
-        \\}}
-        \\
-        \\popover.launcher-popover scrolledwindow undershoot.top,
-        \\popover.launcher-popover scrolledwindow undershoot.bottom,
-        \\popover.launcher-popover scrolledwindow undershoot.left,
-        \\popover.launcher-popover scrolledwindow undershoot.right,
-        \\popover.launcher-popover scrolledwindow overshoot.top,
-        \\popover.launcher-popover scrolledwindow overshoot.bottom,
-        \\popover.launcher-popover scrolledwindow overshoot.left,
-        \\popover.launcher-popover scrolledwindow overshoot.right {{
-        \\  background: none;
-        \\}}
-        \\
-        \\popover.launcher-popover scrolledwindow > undershoot {{
-        \\  background: none;
-        \\}}
-        \\
-        \\popover.launcher-popover grid {{
-        \\  background: {s};
-        \\}}
-        \\
-        // \\/* Launcher app buttons */
-        // \\.launcher-app-button {{
-        // \\  padding: 8px;
-        // \\  border-radius: 8px;
-        // \\  background: transparent;
-        // \\  transition: all 200ms ease;
-        // \\}}
-        // \\
-        // \\.launcher-app-button:hover {{
-        // \\  background-color: rgba(255, 255, 255, 0.1);
-        // \\  transform: scale(1.05);
-        // \\}}
-        // \\
-        // \\.launcher-app-button:active {{
-        // \\  background-color: rgba(255, 255, 255, 0.15);
-        // \\  transform: scale(0.98);
-        // \\}}
-        // \\
-        // \\.launcher-app-button label {{
-        // \\  color: {s};
-        // \\  font-size: 11pt;
-        // \\}}
-        // \\
-    , .{
-        config.theme.background,
-        config.theme.background,
-        config.theme.background,
-        config.theme.background,
-    });
-
-    return try buffer.toOwnedSliceSentinel(0);
 }
 
 pub fn loadCss(
