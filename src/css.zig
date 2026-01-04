@@ -222,7 +222,7 @@ fn writeMusicStyles(buffer: *std.Io.Writer.Allocating, config: *const Config) !v
         \\
         \\
     , .{
-        config.theme.background_darker,
+        config.theme.surface,
     });
 }
 
