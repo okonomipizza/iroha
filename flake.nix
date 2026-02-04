@@ -14,11 +14,11 @@
       };
     };
     zls = {
-        url = "github:zigtools/zls";
-        inputs = {
-            nixpkgs.follows = "nixpkgs";
-            zig-overlay.follows = "zig";
-        };
+      url = "github:zigtools/zls/0.15.1";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+        zig-overlay.follows = "zig";
+      };
     };
   };
 
@@ -35,7 +35,7 @@
           pkgs = nixpkgs.legacyPackages.${system};
         in {
           devShell.${system} = pkgs.callPackage ./nix/devShell.nix {
-            zig = zig.packages.${system}."0.15.1";
+            zig = zig.packages.${system}."0.15.2";
             zls = zls.packages.${system}.zls;
             inherit system;
           };
@@ -45,7 +45,7 @@
               inherit optimize;
 
               revision = self.shortRev or self.dirtyShortRev or "dirty";
-              zig = zig.packages.${system}."0.15.1";
+              zig = zig.packages.${system}."0.15.2";
             };
           in rec {
             iroha-debug = pkgs.callPackage ./nix/package.nix (mkArgs "Debug");

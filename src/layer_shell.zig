@@ -1,5 +1,6 @@
 const std = @import("std");
 const gtk = @import("gtk");
+const gdk = @import("gdk");
 const Config = @import("config.zig");
 
 extern "c" fn gtk_layer_init_for_window(window: *anyopaque) void;

@@ -2,73 +2,36 @@ using Gtk 4.0;
 
 ApplicationWindow window {
   title: "System Bar";
-
   Box main_box {
     orientation: horizontal;
-
+    
     MenuButton menu_button {
         icon-name: "open-menu-symbolic";
         popover: PopoverMenu menu_popover {
             menu-model: menu_model;
         };
     }
-
-    Box launcher_container {
-        orientation: horizontal;
-            MenuButton launcher_button {
-                icon-name: "view-app-grid-symbolic";
-                styles ["launcher-icon-button"]
-                popover: Popover launcher_popover {
-                    styles ["launcher-popover"]
-                    Box launcher_popover_box {
-                        orientation: vertical;
-                        spacing: 8;
-                    margin-start: 12;
-                    margin-end: 12;
-                    margin-top: 12;
-                    margin-bottom: 12;
-                        ScrolledWindow launcher_scroll {
-                            min-content-width: 400;
-                            min-content-height: 300;
-                            max-content-height: 500;
-                            hscrollbar-policy: never;
-                            vscrollbar-policy: automatic;
-                            
-                            Grid launcher_grid {
-                              row-spacing: 20;
-                              column-spacing: 20;
-                              column-homogeneous: true;
-                            }
-                        }
-                    }
-                };
-            }
-    }
-
-    Label {
+    
+    Box spacer {
       hexpand: true;
     }
-
+    
     Box music_container {
       orientation: horizontal;
       spacing: 8;
       styles ["music_container"]
-
       Button music_play_pause_button {
           halign: start;
           valign: center;
           styles ["music-play_pause_button"]
-
           Image music_play_pause_icon {
             styles ["music-play_pause_button_icon"]
           }
       }
-
       ScrolledWindow music_scrolled_window {
         hscrollbar-policy: automatic;
         vscrollbar-policy: never;
         styles ["music-scroll"]
-
         Box music_scrolled_title_box {
             orientation: horizontal;
             spacing: 10;
@@ -80,6 +43,7 @@ ApplicationWindow window {
         }
       }
     }
+    
     Box clock_container {
         orientation: horizontal;
     }

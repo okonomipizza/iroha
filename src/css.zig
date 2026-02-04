@@ -236,7 +236,6 @@ pub fn loadCss(
     }
 
     const css = try generateCss(allocator, config);
-    std.debug.print("Generated CSS:\n{s}\n", .{css});
     defer allocator.free(css);
 
     const provider = gtk.CssProvider.new();

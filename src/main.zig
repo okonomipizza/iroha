@@ -11,16 +11,24 @@ const Music = @import("./widget/music.zig").Music;
 const jsonc = @import("zig_jsonc");
 const Config = @import("config.zig");
 const loadCss = @import("css.zig").loadCss;
-const Launcher = @import("./launcher/launcher.zig").Launcher;
 const onSleep = @import("./widget/system.zig").onSleep;
 const onRestart = @import("./widget/system.zig").onRestart;
 const onShutdown = @import("./widget/system.zig").onShutdown;
 
+// setup funcs()
+const setupMusic = @import("widget/music.zig").setupMusic;
+const setupClock = @import("widget/clock.zig").setupClock;
+const setupMenuPopover = @import("widget/menu.zig").setupMenuPopover;
+
+/// Application activation callback - initializes UI and sets up all widgets
 fn activate(app: *gtk.Application, user_data: ?*anyopaque) callconv(.c) void {
+    // Retrieve application data from user_data pointer
     const data = user_data orelse return;
     const app_data = @as(*AppData, @ptrCast(@alignCast(data)));
     const allocator = app_data.allocator;
 
+    // === CSS setup ===
+    // Load and apply CSS styles from configuration
     app_data.css_provider = loadCss(
         allocator,
         &app_data.config,
@@ -29,50 +37,56 @@ fn activate(app: *gtk.Application, user_data: ?*anyopaque) callconv(.c) void {
         fatalError("css", err);
     };
 
+    // === UI setup ===
     const ui_path = getUIPath(allocator) catch |err| {
         fatalError("UI file not found", err);
     };
     defer allocator.free(ui_path);
 
+    // Convert ui_path to null-terminated C string for GTK API
     const ui_path_z = allocator.dupeZ(u8, ui_path) catch |err| {
         fatalError("Failed to allocate UI path", .{err});
     };
     defer allocator.free(ui_path_z);
 
+    // Parse UI definition from file and create builder
     const builder = gtk.Builder.newFromFile(ui_path_z.ptr);
     defer builder.unref();
 
+    // Get main application window from UI difinition
     const window_obj = gtk.Builder.getObject(builder, "window") orelse {
         fatalError("Failed to get window from UI file", .{});
     };
     const window = @as(*gtk.ApplicationWindow, @ptrCast(window_obj));
 
-    setupLauncher(allocator, builder) catch |err| {
-        fatalError("Failed to set up Launcher", .{err});
+    // === Widget setup ===
+    // Initialize each widget component
+
+    // Menu
+    setupMenuPopover(builder) catch |err| {
+        fatalError("Failed to set up Menu popover", .{err});
     };
 
+    // Music
     const music = setupMusic(allocator, builder) catch |err| {
         fatalError("Failed to set up Music", .{err});
     };
+    music.startAnimation();
 
+    // Clock
     setupClock(builder) catch |err| {
         fatalError("Failed to set up Clock", .{err});
     };
 
-    setupMenuPopover(builder) catch |err| {
-        fatalError("Failed to set up Menu popover", .{err});
-    };
+    // Register application actions (for Menu widget)
     setupActions(app);
 
-    // Finalize window
+    // === Window finalication ===
     gtk.Application.addWindow(app, window.as(gtk.Window));
     gtk.Widget.show(window.as(gtk.Widget));
 
-    music.startAnimation();
-    layer_shell.setupLayerShell(
-        window,
-        &app_data.config,
-    );
+    // Configure window as menu bar style
+    layer_shell.setupLayerShell(window, &app_data.config);
 }
 
 pub fn main() !void {
@@ -100,55 +114,7 @@ pub fn main() !void {
     std.process.exit(@intCast(status));
 }
 
-fn setupLauncher(allocator: std.mem.Allocator, builder: *gtk.Builder) !void {
-    const launcher_container = try getWidget(gtk.Box, builder, "launcher_container");
-    const launcher_button = try getWidget(gtk.MenuButton, builder, "launcher_button");
-    const launcher_popover = try getWidget(gtk.Popover, builder, "launcher_popover");
-    const launcher_popover_box = try getWidget(gtk.Box, builder, "launcher_popover_box");
-    const launcher_scrolled_window = try getWidget(gtk.ScrolledWindow, builder, "launcher_scroll");
-    const launcher_grid = try getWidget(gtk.Grid, builder, "launcher_grid");
-
-    _ = try Launcher.init(
-        allocator,
-        launcher_container,
-        launcher_button,
-        launcher_popover,
-        launcher_popover_box,
-        launcher_scrolled_window,
-        launcher_grid,
-    );
-}
-
-fn setupMusic(allocator: std.mem.Allocator, builder: *gtk.Builder) !*Music {
-    const music_container = try getWidget(gtk.Box, builder, "music_container");
-    const music_play_pause_button = try getWidget(gtk.Button, builder, "music_play_pause_button");
-    const music_play_pause_icon = try getWidget(gtk.Image, builder, "music_play_pause_icon");
-    const music_scrolled = try getWidget(gtk.ScrolledWindow, builder, "music_scrolled_window");
-    const music_scrolled_title_box = try getWidget(gtk.Box, builder, "music_scrolled_title_box");
-    const music_scrolled_title_label = try getWidget(gtk.Label, builder, "music_scrolled_label");
-
-    return try Music.init(
-        allocator,
-        music_container,
-        music_play_pause_button,
-        music_play_pause_icon,
-        music_scrolled,
-        music_scrolled_title_box,
-        music_scrolled_title_label,
-    );
-}
-
-fn setupClock(builder: *gtk.Builder) !void {
-    const clock_container = try getWidget(gtk.Box, builder, "clock_container");
-    var clock = Clock.new(9);
-    gtk.Box.append(clock_container, clock.as(gtk.Widget));
-}
-
-fn setupMenuPopover(builder: *gtk.Builder) !void {
-    const menu_popover = try getWidget(gtk.Popover, builder, "menu_popover");
-    gtk.Popover.setHasArrow(menu_popover, 0);
-}
-
+// Grobal app state
 const AppData = struct {
     arena: *std.heap.ArenaAllocator,
     allocator: std.mem.Allocator,
@@ -182,12 +148,6 @@ const AppData = struct {
         parent_allocator.destroy(self);
     }
 };
-
-fn getWidget(comptime T: type, builder: *gtk.Builder, name: [*:0]const u8) !*T {
-    const obj = gtk.Builder.getObject(builder, name) orelse
-        return error.WidgetNotFound;
-    return @ptrCast(obj);
-}
 
 fn fatalError(component: []const u8, err: anytype) noreturn {
     std.debug.print("{s}: {}\n", .{ component, err });

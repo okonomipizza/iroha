@@ -2,6 +2,7 @@ const std = @import("std");
 const glib = @import("glib");
 const gobject = @import("gobject");
 const gtk = @import("gtk");
+const getWidget = @import("helpers.zig").getWidget;
 
 const ClockMode = enum(c_int) {
     time_only, // HH:MM:SS
@@ -151,3 +152,9 @@ pub const Clock = extern struct {
 
     const Self = @This();
 };
+
+pub fn setupClock(builder: *gtk.Builder) !void {
+    const clock_container = try getWidget(gtk.Box, builder, "clock_container");
+    var clock = Clock.new(9);
+    gtk.Box.append(clock_container, clock.as(gtk.Widget));
+}

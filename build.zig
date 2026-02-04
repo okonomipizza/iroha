@@ -31,6 +31,43 @@ pub fn build(b: *std.Build) void {
         .root_module = mod,
     });
 
+    const gtk4_flags = b.run(&.{ "pkg-config", "--cflags", "--libs", "gtk4" });
+    var gtk4_flag_iter = std.mem.splitAny(u8, std.mem.trim(u8, gtk4_flags, " \n\r\t"), " ");
+    while (gtk4_flag_iter.next()) |flag| {
+        if (std.mem.startsWith(u8, flag, "-I")) {
+            exe.addIncludePath(.{ .cwd_relative = flag[2..] });
+        } else if (std.mem.startsWith(u8, flag, "-L")) {
+            exe.addLibraryPath(.{ .cwd_relative = flag[2..] });
+        } else if (std.mem.startsWith(u8, flag, "-l")) {
+            exe.linkSystemLibrary(flag[2..]);
+        }
+    }
+
+    const layer_shell_flags = b.run(&.{ "pkg-config", "--cflags", "--libs", "gtk4-layer-shell-0" });
+    var layer_shell_flag_iter = std.mem.splitAny(u8, std.mem.trim(u8, layer_shell_flags, " \n\r\t"), " ");
+    while (layer_shell_flag_iter.next()) |flag| {
+        if (std.mem.startsWith(u8, flag, "-I")) {
+            exe.addIncludePath(.{ .cwd_relative = flag[2..] });
+        } else if (std.mem.startsWith(u8, flag, "-L")) {
+            exe.addLibraryPath(.{ .cwd_relative = flag[2..] });
+        } else if (std.mem.startsWith(u8, flag, "-l")) {
+            exe.linkSystemLibrary(flag[2..]);
+        }
+    }
+
+    exe.linkLibC();
+    exe.linkSystemLibrary("wayland-client");
+    exe.addCSourceFile(.{
+        .file = b.path("lib/wlr-data-control-protocol.c"),
+        .flags = &.{"-std=c99"},
+    });
+
+    exe.addIncludePath(b.path("lib"));
+
+    // exe.linkSystemLibrary("xkbcommon");
+
+    // GDK4とGTK4のフラグを取得してリンク
+
     const zig_jsonc = b.dependency("zig_jsonc", .{});
     exe.root_module.addImport("zig_jsonc", zig_jsonc.module("zig_jsonc"));
 
@@ -44,24 +81,11 @@ pub fn build(b: *std.Build) void {
 
     // For dev
     const install_dev_ui = b.addInstallFile(ui_output, "ui/system-bar.ui");
-
     // For production
     const install_prod_ui = b.addInstallFile(ui_output, "share/iroha/ui/system-bar.ui");
 
     b.getInstallStep().dependOn(&install_dev_ui.step);
     b.getInstallStep().dependOn(&install_prod_ui.step);
-
-    const layer_shell_flags = b.run(&.{ "pkg-config", "--cflags", "--libs", "gtk4-layer-shell-0" });
-    var layer_shell_flag_iter = std.mem.splitAny(u8, std.mem.trim(u8, layer_shell_flags, " \n\r\t"), " ");
-    while (layer_shell_flag_iter.next()) |flag| {
-        if (std.mem.startsWith(u8, flag, "-I")) {
-            exe.addIncludePath(.{ .cwd_relative = flag[2..] });
-        } else if (std.mem.startsWith(u8, flag, "-L")) {
-            exe.addLibraryPath(.{ .cwd_relative = flag[2..] });
-        } else if (std.mem.startsWith(u8, flag, "-l")) {
-            exe.linkSystemLibrary(flag[2..]);
-        }
-    }
 
     b.installArtifact(exe);
 

@@ -5,6 +5,7 @@ const gtk = @import("gtk");
 const gio = @import("gio");
 const AppLauncheDataManager = @import("data.zig").AppLaunchManager;
 const AppEntry = @import("info.zig").AppEntry;
+const getWidget = @import("../helpers.zig").getWidget;
 
 const info = @import("./info.zig");
 
@@ -151,3 +152,22 @@ pub const Launcher = struct {
         }
     }
 };
+
+pub fn setupLauncher(allocator: std.mem.Allocator, builder: *gtk.Builder) !void {
+    const launcher_container = try getWidget(gtk.Box, builder, "launcher_container");
+    const launcher_button = try getWidget(gtk.MenuButton, builder, "launcher_button");
+    const launcher_popover = try getWidget(gtk.Popover, builder, "launcher_popover");
+    const launcher_popover_box = try getWidget(gtk.Box, builder, "launcher_popover_box");
+    const launcher_scrolled_window = try getWidget(gtk.ScrolledWindow, builder, "launcher_scroll");
+    const launcher_grid = try getWidget(gtk.Grid, builder, "launcher_grid");
+
+    _ = try Launcher.init(
+        allocator,
+        launcher_container,
+        launcher_button,
+        launcher_popover,
+        launcher_popover_box,
+        launcher_scrolled_window,
+        launcher_grid,
+    );
+}

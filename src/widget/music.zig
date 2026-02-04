@@ -4,6 +4,7 @@ const gobject = @import("gobject");
 const gtk = @import("gtk");
 const gdk = @import("gdk");
 const pango = @import("pango");
+const getWidget = @import("helpers.zig").getWidget;
 
 pub const Music = struct {
     allocator: std.mem.Allocator,
@@ -322,3 +323,23 @@ pub const Music = struct {
         }
     }
 };
+
+
+pub fn setupMusic(allocator: std.mem.Allocator, builder: *gtk.Builder) !*Music {
+    const music_container = try getWidget(gtk.Box, builder, "music_container");
+    const music_play_pause_button = try getWidget(gtk.Button, builder, "music_play_pause_button");
+    const music_play_pause_icon = try getWidget(gtk.Image, builder, "music_play_pause_icon");
+    const music_scrolled = try getWidget(gtk.ScrolledWindow, builder, "music_scrolled_window");
+    const music_scrolled_title_box = try getWidget(gtk.Box, builder, "music_scrolled_title_box");
+    const music_scrolled_title_label = try getWidget(gtk.Label, builder, "music_scrolled_label");
+
+    return try Music.init(
+        allocator,
+        music_container,
+        music_play_pause_button,
+        music_play_pause_icon,
+        music_scrolled,
+        music_scrolled_title_box,
+        music_scrolled_title_label,
+    );
+}

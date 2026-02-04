@@ -18,7 +18,10 @@
     zstd,
     zls,
     blueprint-compiler,
+    
 }: let
+    wayland-protocols-path = "${pkgs.wayland-protocols}/share/wayland-protocols";
+    wlr-protocols-path = "${pkgs.wlr-protocols}/share/wlr-protocols";
     zig-gobject-bindings = fetchurl {
         name = "bindings-gnome46.tar.zst";
         url = "https://github.com/ianprime0509/zig-gobject/releases/download/v0.3.0/bindings-gnome46.tar.zst";
@@ -44,6 +47,13 @@
           zstd
           blueprint-compiler
           adwaita-icon-theme
+
+      pkgs.wayland
+      pkgs.wayland-protocols
+      pkgs.wlr-protocols
+      pkgs.wayland-scanner
+      pkgs.pkg-config
+      pkgs.libxkbcommon
         ];
 
       shellHook = ''
@@ -53,6 +63,13 @@
         echo "  GTK4: $(pkg-config --modversion gtk4)"
         echo "  GTK4 Layer Shell: $(pkg-config --modversion gtk4-layer-shell-0 2>/dev/null || echo "available")"
         echo "  GObject Introspection: $(pkg-config --modversion gobject-introspection-1.0)"
+              echo "Protocol paths:"
+              echo "  WAYLAND_PROTOCOLS: ${wayland-protocols-path}"
+              echo "  WLR_PROTOCOLS: ${wlr-protocols-path}"
+              echo ""
+                export WAYLAND_PROTOCOLS_DIR="${wayland-protocols-path}"
+                export WLR_PROTOCOLS_DIR="${wlr-protocols-path}"
+              echo "Ready for development!!"
         echo ""
 
         if [ ! -d "zig-out/bindings" ]; then
