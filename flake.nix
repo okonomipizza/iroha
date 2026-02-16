@@ -38,6 +38,22 @@
             zls = zls.packages.${system}.zls;
           };
 
+          packages.${system} = let
+            mkArgs = optimize: {
+              inherit optimize;
+
+              revision = self.shortRev or self.dirtyShortRev or "dirty";
+              zig = zig.packages.${system}."master";
+            };
+          in rec {
+            pai-debug = pkgs.callPackage ./nix/package.nix (mkArgs "Debug");
+            pai-releasesafe = pkgs.callPackage ./nix/package.nix (mkArgs "ReleaseSafe");
+            pai-releasefast = pkgs.callPackage ./nix/package.nix (mkArgs "ReleaseFast");
+
+            pai = pai-releasefast;
+            default = pai;
+          };
+
           formatter.${system} = pkgs.alejandra;
         }
       ) (builtins.attrNames zig.packages)
