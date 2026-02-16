@@ -15,6 +15,12 @@
         ];
 
       shellHook = ''
+        if [ -f .env ]; then
+            set -a
+            source .env
+            set +a
+        fi
+
         echo "Development environment loaded!"
         echo ""
         echo "  Zig: $(zig version)"
