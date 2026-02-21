@@ -28,6 +28,9 @@
     zls,
     ...
   }:
+    let
+      version = nixpkgs.lib.trim (builtins.readFile ./src/.version);
+    in
     builtins.foldl' nixpkgs.lib.recursiveUpdate {} (
       builtins.map (
         system: let
@@ -41,6 +44,7 @@
           packages.${system} = let
             mkArgs = optimize: {
               inherit optimize;
+              inherit version;
 
               revision = self.shortRev or self.dirtyShortRev or "dirty";
               zig = zig.packages.${system}."master";

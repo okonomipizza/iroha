@@ -8,6 +8,7 @@
   autoPatchelfHook,
   revision ? "dirty",
   optimize ? "Debug",
+  version,
 }: let
   zig_clap = fetchFromGitHub {
     owner = "Hejsil";
@@ -18,7 +19,7 @@
 in
   stdenv.mkDerivation (finalAttrs: {
     pname = "iroha";
-    version = "0.1.2-${revision}";
+    version = "${version}-${revision}";
     src = lib.cleanSource ../.;
 
     nativeBuildInputs = [
@@ -50,7 +51,7 @@ in
       cat > build.zig.zon <<'ZON_EOF'
 .{
     .name = .iroha,
-    .version = "0.1.2",
+    .version = "${version}",
     .fingerprint = 0x472cb64af18edb93,
     .minimum_zig_version = "0.16.0-dev.2623+27eec9bd6",
     .dependencies = .{

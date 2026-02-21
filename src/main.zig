@@ -5,6 +5,8 @@ const Resources = @import("Resources.zig");
 
 const clap = @import("clap");
 
+const version = std.mem.trim(u8, @embedFile("./.version"), "\r\n");
+
 pub fn main(init: std.process.Init) !void {
     const gpa = init.gpa;
 
@@ -36,7 +38,7 @@ pub fn main(init: std.process.Init) !void {
     }
     // --- Show version ---
     if (result.args.version != 0) {
-        try print(stdout_writer, "0.0.1");
+        try print(stdout_writer, version);
         return try stdout_writer.flush();
     }
 
