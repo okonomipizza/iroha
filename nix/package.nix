@@ -51,7 +51,7 @@ in
 .{
     .name = .iroha,
     .version = "0.0.1",
-    .fingerprint = 0xe3383258e145451e,
+    .fingerprint = 0x472cb64af18edb93,
     .minimum_zig_version = "0.16.0-dev.2623+27eec9bd6",
     .dependencies = .{
         .clap = .{
