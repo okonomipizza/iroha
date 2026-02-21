@@ -17,8 +17,8 @@
   };
 in
   stdenv.mkDerivation (finalAttrs: {
-    pname = "pai";
-    version = "0.0.1-${revision}";
+    pname = "iroha";
+    version = "0.1.0-${revision}";
     src = lib.cleanSource ../.;
 
     nativeBuildInputs = [
@@ -49,7 +49,7 @@ in
       # Create modified build.zig.zon for Nix build
       cat > build.zig.zon <<'ZON_EOF'
 .{
-    .name = .pai,
+    .name = .iroha,
     .version = "0.0.1",
     .fingerprint = 0xe3383258e145451e,
     .minimum_zig_version = "0.16.0-dev.2623+27eec9bd6",
@@ -81,7 +81,7 @@ ZON_EOF
 
     installPhase = ''
       runHook preInstall
-      if [ ! -f "$out/bin/pai" ]; then
+      if [ ! -f "$out/bin/iroha" ]; then
         echo "Error: binary not found"
         find $out -type f
         exit 1
@@ -91,9 +91,9 @@ ZON_EOF
 
     meta = {
       description = "Pipe to AI - CLI tool to pipe input to Claude API";
-      homepage = "https://github.com/okonomipizza/pai";
+      homepage = "https://github.com/okonomipizza/iroha";
       license = lib.licenses.mit;
       platforms = lib.platforms.linux;
-      mainProgram = "pai";
+      mainProgram = "iroha";
     };
   })

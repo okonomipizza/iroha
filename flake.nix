@@ -46,12 +46,12 @@
               zig = zig.packages.${system}."master";
             };
           in rec {
-            pai-debug = pkgs.callPackage ./nix/package.nix (mkArgs "Debug");
-            pai-releasesafe = pkgs.callPackage ./nix/package.nix (mkArgs "ReleaseSafe");
-            pai-releasefast = pkgs.callPackage ./nix/package.nix (mkArgs "ReleaseFast");
+            iroha-debug = pkgs.callPackage ./nix/package.nix (mkArgs "Debug");
+            iroha-releasesafe = pkgs.callPackage ./nix/package.nix (mkArgs "ReleaseSafe");
+            iroha-releasefast = pkgs.callPackage ./nix/package.nix (mkArgs "ReleaseFast");
 
-            pai = pai-releasefast;
-            default = pai;
+            iroha = iroha-releasefast;
+            default = iroha;
           };
 
           formatter.${system} = pkgs.alejandra;
