@@ -14,10 +14,11 @@ pub fn main(init: std.process.Init) !void {
 
     // Clap
     const params = comptime clap.parseParamsComptime(
-        \\-h, --help Display this help and exit.
-        \\-v, --version Print version.
-        \\-l, --log <str>  After chat, history will be save.
-        \\-r, --resource <str>... Path to resource files sent to Claude
+        \\-h, --help                Display this help and exit.
+        \\-v, --version             Print version.
+        \\-l, --log <str>           After chat, history will be save.
+        \\-r, --resource <str>...   Path to resource files sent to Claude.
+        \\-p, --prompt <str>        Allows setting the request content for Claude.
     );
     var diag = clap.Diagnostic{};
     var result = clap.parse(clap.Help, &params, clap.parsers.default, init.minimal.args, .{
@@ -45,12 +46,16 @@ pub fn main(init: std.process.Init) !void {
         return;
     };
 
+    var input = std.ArrayList(u8){};
+    defer input.deinit(gpa);
+
+    if (result.args.prompt) |p| {
+        try input.appendSlice(gpa, p);
+    }
+
     // Read stdin into a dynamic buffer chunk by chunk.
     var stdin_buf: [4096]u8 = undefined;
     var reader = std.Io.File.stdin().reader(init.io, &stdin_buf);
-
-    var input = std.ArrayList(u8){};
-    defer input.deinit(gpa);
 
     var chunk: [1024]u8 = undefined;
     while (true) {
