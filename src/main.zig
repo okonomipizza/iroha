@@ -1,75 +1,87 @@
 const std = @import("std");
 const Io = std.Io;
-const Claude = @import("claude.zig");
+const Claude = @import("Claude.zig");
+const Resources = @import("Resources.zig");
 
 const clap = @import("clap");
 
 pub fn main(init: std.process.Init) !void {
-    const arena: std.mem.Allocator = init.arena.allocator();
+    const gpa = init.gpa;
 
     var stdout_buffer: [1024]u8 = undefined;
     var stdout_file_writer: Io.File.Writer = .init(.stdout(), init.io, &stdout_buffer);
     const stdout_writer = &stdout_file_writer.interface;
 
+    // Clap
     const params = comptime clap.parseParamsComptime(
         \\-h, --help Display this help and exit.
         \\-v, --version Print version.
         \\-l, --log <str>  After chat, history will be save.
+        \\-r, --resource <str>... Path to resource files sent to Claude
     );
-
     var diag = clap.Diagnostic{};
     var result = clap.parse(clap.Help, &params, clap.parsers.default, init.minimal.args, .{
         .diagnostic = &diag,
-        .allocator = init.gpa,
+        .allocator = gpa,
     }) catch |err| {
         try diag.reportToFile(init.io, .stderr(), err);
         return err;
     };
     defer result.deinit();
 
-    // Show help
+    // --- Show help ---
     if (result.args.help != 0) {
         return clap.helpToFile(init.io, .stderr(), clap.Help, &params, .{});
     }
+    // --- Show version ---
     if (result.args.version != 0) {
         try print(stdout_writer, "0.0.1");
         return try stdout_writer.flush();
     }
 
+    // Get ANTHROPIC_API_KEY from envrionment variables
+    const api_key = init.environ_map.get("ANTHROPIC_API_KEY") orelse {
+        std.debug.print("ANTHROPIC_API_KEY not found.\nDo 'export ANTHROPIC_API_KEY=<your_api_key>'\n", .{});
+        return;
+    };
+
+    // Read stdin into a dynamic buffer chunk by chunk.
+    var stdin_buf: [4096]u8 = undefined;
+    var reader = std.Io.File.stdin().reader(init.io, &stdin_buf);
+
+    var input = std.ArrayList(u8){};
+    defer input.deinit(gpa);
+
+    var chunk: [1024]u8 = undefined;
+    while (true) {
+        const n = try reader.interface.readSliceShort(&chunk);
+        if (n == 0) break;
+        try input.appendSlice(gpa, chunk[0..n]);
+    }
+
+    // Collect some resources user input
+    var resources = try Resources.init(gpa, init.io, result.args.resource);
+    defer resources.deinit(gpa);
+
+    // If thr user specified a log file path, retrieve it.
     const log_path: ?[]const u8 = if (result.args.log) |path| blk: {
         try validateLogFilePath(path);
         break :blk path;
     } else null;
 
-    // Get ANTHROPIC_API_KEY from envrionment variables
-    const api_key = init.environ_map.get("ANTHROPIC_API_KEY") orelse {
-        std.debug.print("ANTHROPIC_API_KEY not found.\n", .{});
-        return;
-    };
+    var claude = try Claude.init(
+        gpa,
+        api_key,
+        init.io,
+        .{ .resources = resources, .log_path = log_path },
+    );
+    defer claude.deinit(gpa);
 
-    var claude = try Claude.init(arena, api_key, init.io, .{ .log_path = log_path });
-    defer claude.deinit(arena);
+    const res = try claude.call(gpa, init.io, input.items);
+    defer gpa.free(res);
 
-    // Get some data to be sent from stdin to Claude API.
-    var stdin_buf: [4096]u8 = undefined;
-    var reader = std.Io.File.stdin().reader(init.io, &stdin_buf);
-
-    // Read stdin into a dynamic buffer chunk by chunk.
-    var input = std.ArrayList(u8){};
-    var chunk: [1024]u8 = undefined;
-    while (true) {
-        const n = try reader.interface.readSliceShort(&chunk);
-        if (n == 0) break;
-        try input.appendSlice(arena, chunk[0..n]);
-    }
-
-    const res = try claude.call(arena, init.io, input.items);
-
-    var writer = std.Io.Writer.Allocating.init(arena);
-    defer writer.deinit();
-
+    // Print response from Claude API
     try print(stdout_writer, res);
-
     try stdout_writer.flush(); // Don't forget to flush!
 }
 

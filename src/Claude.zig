@@ -2,6 +2,7 @@ const std = @import("std");
 const c = @cImport({
     @cInclude("curl/curl.h");
 });
+const Resources = @import("Resources.zig");
 
 const Claude = @This();
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
@@ -11,8 +12,10 @@ pub const Message = struct {
     content: []const u8,
 };
 
+/// Options to configure client behavior.
 const ClaudeOption = struct {
     log_path: ?[]const u8 = null,
+    resources: *Resources,
 };
 
 /// We use curl to query the Anthropic API.
@@ -20,12 +23,13 @@ curl: *c.CURL,
 /// Anthropic API key.
 /// Export "ANTHROPIC_API_KEY=<your_key>" before running.
 api_key: []const u8,
-/// Options to configure client behavior.
-option: ClaudeOption,
+/// Paths to resource files that sent to api
+resources: *Resources,
 /// If log_path is provided via options, the client loads message history from the log file.
 log: ?[]Message,
 /// Path to log file.
 log_path: ?[]const u8 = null,
+io: std.Io,
 
 /// Initialize a Claude client.
 pub fn init(allocator: std.mem.Allocator, api_key: []const u8, io: std.Io, option: ClaudeOption) !Claude {
@@ -39,9 +43,10 @@ pub fn init(allocator: std.mem.Allocator, api_key: []const u8, io: std.Io, optio
     return .{
         .curl = curl,
         .api_key = api_key,
-        .option = option,
+        .resources = option.resources,
         .log = log,
         .log_path = option.log_path,
+        .io = io,
     };
 }
 
@@ -125,6 +130,31 @@ fn writeCallback(ptr: *anyopaque, size: usize, nmemb: usize, userdata: *anyopaqu
 
 /// Call the Claude API with the message history and the given input.
 pub fn call(self: *Claude, allocator: std.mem.Allocator, io: std.Io, input: []const u8) ![]u8 {
+    // Include resources as contents
+    var content_aw = std.Io.Writer.Allocating.init(allocator);
+    defer content_aw.deinit();
+
+    try content_aw.writer.writeAll(input);
+
+    if (self.resources.paths.items.len > 0) {
+        var metadata_list = try self.resources.getFileContent(allocator, self.io);
+        defer {
+            for (metadata_list.items) |data| {
+                data.deinit(allocator);
+            }
+            metadata_list.deinit(allocator);
+        }
+
+        try content_aw.writer.writeAll("\n\n---\n\n");
+        for (metadata_list.items) |metadata| {
+            try content_aw.writer.print("{s}\n\n{s}\n\n", .{ metadata.path, metadata.content });
+        }
+    }
+
+    const full_content = try content_aw.toOwnedSlice();
+    defer allocator.free(full_content);
+
+    // Create 'messages' to be sent to api
     var aw = std.Io.Writer.Allocating.init(allocator);
     defer aw.deinit();
 
@@ -134,8 +164,9 @@ pub fn call(self: *Claude, allocator: std.mem.Allocator, io: std.Io, input: []co
             try aw.writer.print("{f},", .{std.json.fmt(msg, .{})});
         }
     }
-    const new_msg = Message{ .role = "user", .content = input };
+    const new_msg = Message{ .role = "user", .content = full_content };
     try aw.writer.print("{f}", .{std.json.fmt(new_msg, .{})});
+    try aw.writer.writeAll("\n\n");
     try aw.writer.writeByte(']');
 
     const messages_json = try aw.toOwnedSlice();
@@ -147,7 +178,11 @@ pub fn call(self: *Claude, allocator: std.mem.Allocator, io: std.Io, input: []co
     ,
         .{messages_json},
     );
+    defer allocator.free(body);
+
+    // Null-terminate the body for curl.
     const body_z = try allocator.dupeZ(u8, body);
+    defer allocator.free(body_z);
 
     const curl = self.curl;
     const auth_header = try std.fmt.allocPrint(allocator, "x-api-key: {s}", .{self.api_key});
@@ -155,12 +190,16 @@ pub fn call(self: *Claude, allocator: std.mem.Allocator, io: std.Io, input: []co
     headers = c.curl_slist_append(headers, auth_header.ptr);
     headers = c.curl_slist_append(headers, "anthropic-version: 2023-06-01");
     headers = c.curl_slist_append(headers, "Content-Type: application/json");
-    defer c.curl_slist_free_all(headers);
+    defer {
+        allocator.free(auth_header);
+        c.curl_slist_free_all(headers);
+    }
 
     var ctx = WriteContext{
         .allocator = allocator,
         .list = std.ArrayList(u8){},
     };
+    defer ctx.list.deinit(allocator);
 
     _ = c.curl_easy_setopt(curl, c.CURLOPT_URL, ANTHROPIC_API_URL);
     _ = c.curl_easy_setopt(curl, c.CURLOPT_POSTFIELDS, body_z.ptr);
@@ -178,6 +217,16 @@ pub fn call(self: *Claude, allocator: std.mem.Allocator, io: std.Io, input: []co
     }
 
     return response;
+}
+
+fn appendResources(self: *Claude, allocator: std.mem.Allocator, aw: *std.Io.Writer.Allocating, resources: *Resources) !void {
+    const metadata_list = try resources.getFileContent(allocator, self.io);
+    try aw.writer.writeAll("\\n---\\n");
+    for (metadata_list.items) |metadata| {
+        try aw.writer.writeAll(metadata.path);
+        try aw.writer.writeAll(metadata.content);
+        try aw.writer.writeAll("\\n");
+    }
 }
 
 const ContentBlock = struct {
