@@ -66,6 +66,11 @@ pub fn main(init: std.process.Init) !void {
         try input.appendSlice(gpa, chunk[0..n]);
     }
 
+    if (input.items.len == 0) {
+        std.debug.print("Error: No input provided. Use -p <prompt> or pipe input via stdin.\n", .{});
+        return error.NoInput;
+    }
+
     // Collect some resources user input
     var resources = try Resources.init(gpa, init.io, result.args.resource);
     defer resources.deinit(gpa);

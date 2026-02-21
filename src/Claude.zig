@@ -179,6 +179,7 @@ pub fn call(self: *Claude, allocator: std.mem.Allocator, io: std.Io, input: []co
         .{messages_json},
     );
     defer allocator.free(body);
+    std.debug.print("body: {s}\n", .{body});
 
     // Null-terminate the body for curl.
     const body_z = try allocator.dupeZ(u8, body);
