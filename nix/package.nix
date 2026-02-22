@@ -16,6 +16,12 @@
     rev = "27621cb7207643f914bae7b01902b22a8b5916e7";
     sha256 = "sha256-jqzzo1ma78M8lfLfdXHyzEsr6PEPQSigrF3Nx2EJ/LI=";
   };
+  zig_jsonc = fetchFromGitHub {
+    owner = "okonomipizza";
+    repo = "zig-jsonc";
+    rev = "7c23a50aff684e559f176c19f1ba6a2d0f51d1ad";
+    sha256 = "sha256-Qs82YFZ/bKj8WK7yf7rnCBtC2hkncXehGw89HZaSEJM=";
+  };
 in
   stdenv.mkDerivation (finalAttrs: {
     pname = "iroha";
@@ -46,6 +52,8 @@ in
       mkdir -p ./deps
       cp -r ${zig_clap} ./deps/zig_clap
       chmod -R +w ./deps/zig_clap
+      cp -r ${zig_jsonc} ./deps/zig_jsonc
+      chmod -R +w ./deps/zig_jsonc
 
       # Create modified build.zig.zon for Nix build
       cat > build.zig.zon <<'ZON_EOF'
@@ -57,6 +65,9 @@ in
     .dependencies = .{
         .clap = .{
             .path = "./deps/zig_clap",
+        },
+        .zig_jsonc = .{
+            .path = "./deps/zig_jsonc",
         },
     },
     .paths = .{
