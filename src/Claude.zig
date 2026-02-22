@@ -72,12 +72,17 @@ fn loadLog(allocator: std.mem.Allocator, io: std.Io, path: []const u8) ![]Messag
             allocator,
             line,
             .{
-                .allocate = .alloc_always,
                 .ignore_unknown_fields = true,
             },
         ) catch continue;
-        try messages.append(allocator, parsed.value);
+        defer parsed.deinit();
+
+        try messages.append(allocator, .{
+            .role = try allocator.dupe(u8, parsed.value.role),
+            .content = try allocator.dupe(u8, parsed.value.content),
+        });
     }
+
     return messages.toOwnedSlice(allocator);
 }
 

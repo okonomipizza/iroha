@@ -2,13 +2,18 @@ const std = @import("std");
 const Io = std.Io;
 const Claude = @import("Claude.zig");
 const Resources = @import("Resources.zig");
+const Config = @import("Config.zig");
 
 const clap = @import("clap");
+const jsonc = @import("jsonc");
 
 const version = std.mem.trim(u8, @embedFile("./.version"), "\r\n");
 
 pub fn main(init: std.process.Init) !void {
     const gpa = init.gpa;
+
+    var iroha_config = try Config.init(init.io, gpa, init.environ_map);
+    defer iroha_config.deinit(gpa);
 
     var stdout_buffer: [65536]u8 = undefined;
     var stdout_file_writer: Io.File.Writer = .init(.stdout(), init.io, &stdout_buffer);
@@ -18,7 +23,7 @@ pub fn main(init: std.process.Init) !void {
     const params = comptime clap.parseParamsComptime(
         \\-h, --help                Display this help and exit.
         \\-v, --version             Print version.
-        \\-l, --log <str>           After chat, history will be save.
+        \\-n, --new                 Start new conversation. New chat log file will be created.
         \\-r, --resource <str>...   Path to resource files sent to Claude.
         \\-p, --prompt <str>        Allows setting the request content for Claude.
     );
@@ -41,6 +46,14 @@ pub fn main(init: std.process.Init) !void {
         try print(stdout_writer, version);
         return try stdout_writer.flush();
     }
+    // If the user specified --new, create a new log file in the logs directory.
+    const log_path = if (result.args.new != 0) blk: {
+        break :blk try iroha_config.getLogFilePath(init.io, gpa, .{});
+    } else blk: {
+        // No --new flag: resume the latest existing conversation.
+        break :blk try iroha_config.getLogFilePath(init.io, gpa, .{ .latest = true });
+    };
+    defer gpa.free(log_path);
 
     // Get ANTHROPIC_API_KEY from envrionment variables
     const api_key = init.environ_map.get("ANTHROPIC_API_KEY") orelse {
@@ -74,12 +87,6 @@ pub fn main(init: std.process.Init) !void {
     // Collect some resources user input
     var resources = try Resources.init(gpa, init.io, result.args.resource);
     defer resources.deinit(gpa);
-
-    // If thr user specified a log file path, retrieve it.
-    const log_path: ?[]const u8 = if (result.args.log) |path| blk: {
-        try validateLogFilePath(path);
-        break :blk path;
-    } else null;
 
     var claude = try Claude.init(
         gpa,

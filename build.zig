@@ -21,6 +21,9 @@ pub fn build(b: *std.Build) void {
     const clap = b.dependency("clap", .{});
     exe.root_module.addImport("clap", clap.module("clap"));
 
+    const zig_jsonc = b.dependency("zig_jsonc", .{});
+    exe.root_module.addImport("jsonc", zig_jsonc.module("zig_jsonc"));
+
     b.installArtifact(exe);
 
     const run_step = b.step("run", "Run the app");

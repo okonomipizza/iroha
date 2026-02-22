@@ -36,12 +36,16 @@
             .url = "git+https://github.com/Hejsil/zig-clap#27621cb7207643f914bae7b01902b22a8b5916e7",
             .hash = "clap-0.11.0-oBajBxDoAQChQCl4LRM4tyf-VChKLbhYilS806xxzxrQ",
         },
+        .zig_jsonc = .{
+            .url = "git+https://github.com/okonomipizza/zig-jsonc#7c23a50aff684e559f176c19f1ba6a2d0f51d1ad",
+            .hash = "zig_jsonc-0.0.0-ZJtIlNV3AAAehVHorGXZcI1gPSQekjMe_O76qgm0ffaF",
+        },
     },
     .paths = .{
         "build.zig",
         "build.zig.zon",
         "src",
-        "./"
+        "./",
         // For example...
         //"LICENSE",
         //"README.md",
