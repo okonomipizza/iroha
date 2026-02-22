@@ -6,6 +6,7 @@ const Resources = @import("Resources.zig");
 
 const Claude = @This();
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
+const Config = @import("Config.zig");
 
 pub const Message = struct {
     role: []const u8,
@@ -14,6 +15,7 @@ pub const Message = struct {
 
 /// Options to configure client behavior.
 const ClaudeOption = struct {
+    config: Config,
     log_path: ?[]const u8 = null,
     resources: *Resources,
 };
@@ -30,6 +32,8 @@ log: ?[]Message,
 /// Path to log file.
 log_path: ?[]const u8 = null,
 io: std.Io,
+/// App config
+config: Config,
 
 /// Initialize a Claude client.
 pub fn init(allocator: std.mem.Allocator, api_key: []const u8, io: std.Io, option: ClaudeOption) !Claude {
@@ -47,6 +51,7 @@ pub fn init(allocator: std.mem.Allocator, api_key: []const u8, io: std.Io, optio
         .log = log,
         .log_path = option.log_path,
         .io = io,
+        .config = option.config,
     };
 }
 
@@ -179,9 +184,9 @@ pub fn call(self: *Claude, allocator: std.mem.Allocator, io: std.Io, input: []co
 
     const body = try std.fmt.allocPrint(
         allocator,
-        \\{{"model":"claude-haiku-4-5","max_tokens":1024,"messages":{s}}}
+        \\{{"model":"{s}","max_tokens":1024,"messages":{s}}}
     ,
-        .{messages_json},
+        .{ self.config.model, messages_json },
     );
     defer allocator.free(body);
 
@@ -255,12 +260,14 @@ pub const ClaudeResponse = struct {
 };
 
 fn extractResponse(allocator: std.mem.Allocator, response_text: []const u8) ![]u8 {
-    const parsed = try std.json.parseFromSlice(
+    const parsed = std.json.parseFromSlice(
         ClaudeResponse,
         allocator,
         response_text,
         .{ .allocate = .alloc_always, .ignore_unknown_fields = true },
-    );
+    ) catch {
+        return error.InvalidRequest;
+    };
     defer parsed.deinit();
 
     if (parsed.value.content.len == 0) return error.EmptyResponse;

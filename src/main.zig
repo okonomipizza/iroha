@@ -92,7 +92,7 @@ pub fn main(init: std.process.Init) !void {
         gpa,
         api_key,
         init.io,
-        .{ .resources = resources, .log_path = log_path },
+        .{ .config = iroha_config, .resources = resources, .log_path = log_path },
     );
     defer claude.deinit(gpa);
 
