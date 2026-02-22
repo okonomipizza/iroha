@@ -10,7 +10,7 @@ const version = std.mem.trim(u8, @embedFile("./.version"), "\r\n");
 pub fn main(init: std.process.Init) !void {
     const gpa = init.gpa;
 
-    var stdout_buffer: [1024]u8 = undefined;
+    var stdout_buffer: [65536]u8 = undefined;
     var stdout_file_writer: Io.File.Writer = .init(.stdout(), init.io, &stdout_buffer);
     const stdout_writer = &stdout_file_writer.interface;
 
