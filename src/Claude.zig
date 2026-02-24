@@ -1,4 +1,5 @@
 const std = @import("std");
+const Io = std.Io;
 const c = @cImport({
     @cInclude("curl/curl.h");
 });
@@ -128,18 +129,88 @@ pub fn deinit(self: *Claude, allocator: std.mem.Allocator) void {
 
 const WriteContext = struct {
     allocator: std.mem.Allocator,
-    list: std.ArrayList(u8),
+    pending: std.ArrayList(u8),
+    accumulated: std.ArrayList(u8),
+    writer: *Io.Writer,
+
+    pub fn init(allocator: std.mem.Allocator, writer: *Io.Writer) WriteContext {
+        return .{
+            .allocator = allocator,
+            .pending = std.ArrayList(u8){},
+            .accumulated = std.ArrayList(u8){},
+            .writer = writer,
+        };
+    }
+
+    pub fn deinit(self: *WriteContext) void {
+        self.pending.deinit(self.allocator);
+        self.accumulated.deinit(self.allocator);
+    }
 };
+
+const TextDelta = struct {
+    type: []const u8 = "",
+    text: []const u8 = "",
+};
+
+const ContentDelta = struct {
+    type: []const u8 = "",
+    delta: ?TextDelta = null,
+};
+
+fn extractStreamDelta(allocator: std.mem.Allocator, json: []const u8) ![]u8 {
+    const parsed = try std.json.parseFromSlice(
+        ContentDelta,
+        allocator,
+        json,
+        .{ .ignore_unknown_fields = true },
+    );
+    defer parsed.deinit();
+
+    if (std.mem.eql(u8, parsed.value.type, "content_block_delta")) {
+        if (parsed.value.delta) |delta| {
+            if (std.mem.eql(u8, delta.type, "text_delta")) {
+                return allocator.dupe(u8, delta.text);
+            }
+        }
+    }
+    return allocator.dupe(u8, "");
+}
 
 fn writeCallback(ptr: *anyopaque, size: usize, nmemb: usize, userdata: *anyopaque) callconv(.c) usize {
     const ctx: *WriteContext = @ptrCast(@alignCast(userdata));
     const data: [*]u8 = @ptrCast(ptr);
-    ctx.list.appendSlice(ctx.allocator, data[0 .. size * nmemb]) catch return 0;
+    ctx.pending.appendSlice(ctx.allocator, data[0 .. size * nmemb]) catch return 0;
+
+    while (true) {
+        const buf = ctx.pending.items;
+        const newline_pos = std.mem.indexOfScalar(u8, buf, '\n') orelse break;
+        const line = std.mem.trimEnd(u8, buf[0..newline_pos], "\r");
+
+        if (std.mem.startsWith(u8, line, "data: ")) {
+            const json_part = line["data: ".len..];
+            if (!std.mem.eql(u8, json_part, "[DONE]")) {
+                if (extractStreamDelta(ctx.allocator, json_part)) |text| {
+                    defer ctx.allocator.free(text);
+                    if (text.len > 0) {
+                        ctx.writer.print("{s}", .{text}) catch {};
+                        ctx.writer.flush() catch {};
+                        ctx.accumulated.appendSlice(ctx.allocator, text) catch {};
+                    }
+                } else |_| {}
+            }
+        }
+
+        const remaining = ctx.pending.items[newline_pos + 1 ..];
+        std.mem.copyForwards(u8, ctx.pending.items, remaining);
+        ctx.pending.items.len = remaining.len;
+    }
+
     return size * nmemb;
 }
 
 /// Call the Claude API with the message history and the given input.
-pub fn call(self: *Claude, allocator: std.mem.Allocator, io: std.Io, input: []const u8) ![]u8 {
+pub fn call(self: *Claude, writer: *Io.Writer, allocator: std.mem.Allocator, io: std.Io, input: []const u8) !void {
     // Include resources as contents
     var content_aw = std.Io.Writer.Allocating.init(allocator);
     defer content_aw.deinit();
@@ -184,7 +255,7 @@ pub fn call(self: *Claude, allocator: std.mem.Allocator, io: std.Io, input: []co
 
     const body = try std.fmt.allocPrint(
         allocator,
-        \\{{"model":"{s}","max_tokens":1024,"messages":{s}}}
+        \\{{"model":"{s}","max_tokens":1024,"stream":true,"messages":{s}}}
     ,
         .{ self.config.model, messages_json },
     );
@@ -205,11 +276,8 @@ pub fn call(self: *Claude, allocator: std.mem.Allocator, io: std.Io, input: []co
         c.curl_slist_free_all(headers);
     }
 
-    var ctx = WriteContext{
-        .allocator = allocator,
-        .list = std.ArrayList(u8){},
-    };
-    defer ctx.list.deinit(allocator);
+    var ctx = WriteContext.init(allocator, writer);
+    defer ctx.deinit();
 
     _ = c.curl_easy_setopt(curl, c.CURLOPT_URL, ANTHROPIC_API_URL);
     _ = c.curl_easy_setopt(curl, c.CURLOPT_POSTFIELDS, body_z.ptr);
@@ -220,13 +288,9 @@ pub fn call(self: *Claude, allocator: std.mem.Allocator, io: std.Io, input: []co
     const res = c.curl_easy_perform(curl);
     if (res != c.CURLE_OK) return error.CurlFailed;
 
-    const response = try extractResponse(allocator, ctx.list.items);
-
     if (self.log_path) |path| {
-        try appendLog(allocator, io, path, input, response);
+        try appendLog(allocator, io, path, input, ctx.accumulated.items);
     }
-
-    return response;
 }
 
 fn appendResources(self: *Claude, allocator: std.mem.Allocator, aw: *std.Io.Writer.Allocating, resources: *Resources) !void {
@@ -237,63 +301,4 @@ fn appendResources(self: *Claude, allocator: std.mem.Allocator, aw: *std.Io.Writ
         try aw.writer.writeAll(metadata.content);
         try aw.writer.writeAll("\\n");
     }
-}
-
-const ContentBlock = struct {
-    type: []const u8,
-    text: []const u8,
-};
-
-const Usage = struct {
-    input_tokens: u64,
-    output_tokens: u64,
-};
-
-pub const ClaudeResponse = struct {
-    id: []const u8,
-    type: []const u8,
-    role: []const u8,
-    content: []ContentBlock,
-    model: []const u8,
-    stop_reason: []const u8,
-    usage: Usage,
-};
-
-pub const ClaudeError = struct {
-    type: []const u8,
-    message: []const u8,
-};
-
-pub const ErrorResponse = struct {
-    type: []const u8,
-    @"error": ClaudeError,
-    request_id: []const u8,
-};
-
-fn extractResponse(allocator: std.mem.Allocator, response_text: []const u8) ![]u8 {
-    const parsed = std.json.parseFromSlice(
-        ClaudeResponse,
-        allocator,
-        response_text,
-        .{ .allocate = .alloc_always, .ignore_unknown_fields = true },
-    ) catch |err| {
-        if (std.json.parseFromSlice(
-            ErrorResponse,
-            allocator,
-            response_text,
-            .{ .allocate = .alloc_always, .ignore_unknown_fields = true },
-        )) |err_parsed| {
-            defer err_parsed.deinit();
-            std.debug.print("API Error [{s}]: {s}\n", .{
-                err_parsed.value.@"error".type,
-                err_parsed.value.@"error".message,
-            });
-        } else |_| {}
-        return err;
-    };
-    defer parsed.deinit();
-
-    if (parsed.value.content.len == 0) return error.EmptyResponse;
-
-    return try allocator.dupe(u8, parsed.value.content[0].text);
 }

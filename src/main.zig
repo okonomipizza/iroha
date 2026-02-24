@@ -7,15 +7,19 @@ const Config = @import("Config.zig");
 const clap = @import("clap");
 const jsonc = @import("jsonc");
 
+/// Version string shared across zig and nix builds, managed in .version file.
 const version = std.mem.trim(u8, @embedFile("./.version"), "\r\n");
 
 pub fn main(init: std.process.Init) !void {
     const gpa = init.gpa;
 
+    // Load config directory.
+    // If the config directory does not exist,
+    // it will be created in $HOME/.config/iroha.
     var iroha_config = try Config.init(init.io, gpa, init.environ_map);
     defer iroha_config.deinit(gpa);
 
-    var stdout_buffer: [65536]u8 = undefined;
+    var stdout_buffer: [4096]u8 = undefined;
     var stdout_file_writer: Io.File.Writer = .init(.stdout(), init.io, &stdout_buffer);
     const stdout_writer = &stdout_file_writer.interface;
 
@@ -41,16 +45,18 @@ pub fn main(init: std.process.Init) !void {
     if (result.args.help != 0) {
         return clap.helpToFile(init.io, .stderr(), clap.Help, &params, .{});
     }
+
     // --- Show version ---
     if (result.args.version != 0) {
-        try print(stdout_writer, version);
+        try stdout_writer.print("{s}\n", .{version});
         return try stdout_writer.flush();
     }
-    // If the user specified --new, create a new log file in the logs directory.
+
+    // With --new: create a new log file and start a fresh session.
+    // Witout --new: resume the latest existing conversation.
     const log_path = if (result.args.new != 0) blk: {
         break :blk try iroha_config.getLogFilePath(init.io, gpa, .{});
     } else blk: {
-        // No --new flag: resume the latest existing conversation.
         break :blk try iroha_config.getLogFilePath(init.io, gpa, .{ .latest = true });
     };
     defer gpa.free(log_path);
@@ -61,26 +67,28 @@ pub fn main(init: std.process.Init) !void {
         return;
     };
 
+    // Collect input data from stdin and -p
     var input = std.ArrayList(u8){};
     defer input.deinit(gpa);
-
     if (result.args.prompt) |p| {
         try input.appendSlice(gpa, p);
+        try input.append(gpa, '\n');
+    }
+    // Read stdin only if it's piped (not a tty)
+    const is_not_tty = !try std.Io.File.stdin().isTty(init.io);
+    if (is_not_tty) {
+        var stdin_buf: [4096]u8 = undefined;
+        var reader = std.Io.File.stdin().reader(init.io, &stdin_buf);
+        var chunk: [1024]u8 = undefined;
+        while (true) {
+            const n = try reader.interface.readSliceShort(&chunk);
+            if (n == 0) break;
+            try input.appendSlice(gpa, chunk[0..n]);
+        }
     }
 
-    // Read stdin into a dynamic buffer chunk by chunk.
-    var stdin_buf: [4096]u8 = undefined;
-    var reader = std.Io.File.stdin().reader(init.io, &stdin_buf);
-
-    var chunk: [1024]u8 = undefined;
-    while (true) {
-        const n = try reader.interface.readSliceShort(&chunk);
-        if (n == 0) break;
-        try input.appendSlice(gpa, chunk[0..n]);
-    }
-
-    if (input.items.len == 0) {
-        std.debug.print("Error: No input provided. Use -p <prompt> or pipe input via stdin.\n", .{});
+    if (input.items.len == 0 and result.args.resource.len == 0) {
+        std.debug.print("Error: No input provided. Use -p <prompt>, pipe via stdin, or specify resources with -r.\n", .{});
         return error.NoInput;
     }
 
@@ -96,24 +104,8 @@ pub fn main(init: std.process.Init) !void {
     );
     defer claude.deinit(gpa);
 
-    const res = claude.call(gpa, init.io, input.items) catch |err| {
+    claude.call(stdout_writer, gpa, init.io, input.items) catch |err| {
         std.debug.print("Error occurred while calling API: {}\n", .{err});
         std.process.exit(1);
     };
-    defer gpa.free(res);
-
-    // Print response from Claude API
-    try print(stdout_writer, res);
-    try stdout_writer.flush(); // Don't forget to flush!
-}
-
-fn print(writer: *Io.Writer, response_body: []const u8) Io.Writer.Error!void {
-    try writer.print("{s}\n", .{response_body});
-}
-
-fn validateLogFilePath(path: []const u8) !void {
-    const basename = std.Io.Dir.path.basename(path);
-    if (basename.len == 0 or std.mem.eql(u8, basename, ".") or std.mem.eql(u8, basename, "..")) {
-        return error.NotAFilePath;
-    }
 }
