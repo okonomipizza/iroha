@@ -108,4 +108,11 @@ pub fn main(init: std.process.Init) !void {
         std.debug.print("Error occurred while calling API: {}\n", .{err});
         std.process.exit(1);
     };
+
+    // Delete old log files to stay within the max_log lilmit.
+    // Configure max_log in $HOME/.config/iroha/config.jsonc
+    // {
+    //   "max_log": 100
+    // }
+    try iroha_config.deleteOldLogFiles(init.io, gpa);
 }

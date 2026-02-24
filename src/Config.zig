@@ -6,6 +6,7 @@ pub const Config = @This();
 app_dir: []const u8,
 config_file: []const u8,
 log_dir: []const u8,
+max_log: ?u64,
 
 model: []const u8 = DEFAULT_MODEL,
 
@@ -44,28 +45,41 @@ pub fn init(io: std.Io, allocator: std.mem.Allocator, environ_map: *std.process.
     const config_src = try std.Io.Dir.readFileAlloc(app_dir, io, "config.jsonc", allocator, .unlimited);
     defer allocator.free(config_src);
 
-    const model = if (config_src.len == 0) blk: {
-        break :blk try allocator.dupe(u8, DEFAULT_MODEL);
-    } else blk: {
+    var cfg_parsed: ?std.json.Parsed(std.json.Value) = null;
+    defer if (cfg_parsed) |c| c.deinit();
+
+    if (config_src.len > 0) {
         var jsonc_parser = jsonc.Jsonc.init(config_src);
         defer jsonc_parser.deinit();
 
-        const jsonc_parsed = try jsonc_parser.parse(std.json.Value, allocator, .{});
-        defer jsonc_parsed.deinit();
+        cfg_parsed = try jsonc_parser.parse(std.json.Value, allocator, .{});
+    }
 
-        if (jsonc_parsed.value.object.get("model")) |m| {
+    const model = if (cfg_parsed) |p| blk: {
+        if (p.value.object.get("model")) |m| {
             if (m == .string) {
                 break :blk try allocator.dupe(u8, m.string);
             }
         }
         break :blk try allocator.dupe(u8, DEFAULT_MODEL);
+    } else blk: {
+        break :blk try allocator.dupe(u8, DEFAULT_MODEL);
     };
+
+    const max_log: ?u64 = if (cfg_parsed) |p|
+        if (p.value.object.get("max_log")) |m|
+            if (m == .integer) @intCast(m.integer) else null
+        else
+            null
+    else
+        null;
 
     return .{
         .app_dir = app_dir_path,
         .config_file = config_file_path,
         .log_dir = log_dir_path,
         .model = model,
+        .max_log = max_log,
     };
 }
 
@@ -110,6 +124,46 @@ fn createNewLogFile(self: Config, io: std.Io, allocator: std.mem.Allocator) ![]c
     file.close(io);
 
     return new_log_path;
+}
+
+/// User can determine max number of logs.
+pub fn deleteOldLogFiles(self: Config, io: std.Io, allocator: std.mem.Allocator) !void {
+    // Nothing to do if max_log is not configured.
+    const max_log = self.max_log orelse return;
+
+    var log_dir = try std.Io.Dir.openDirAbsolute(io, self.log_dir, .{ .iterate = true });
+    defer log_dir.close(io);
+
+    var names: std.ArrayList([]const u8) = .empty;
+    defer {
+        for (names.items) |name| allocator.free(name);
+        names.deinit(allocator);
+    }
+
+    var iter = log_dir.iterate();
+    while (try iter.next(io)) |entry| {
+        if (entry.kind != .file) continue;
+        try names.append(allocator, try allocator.dupe(u8, entry.name));
+    }
+
+    std.mem.sort([]const u8, names.items, {}, struct {
+        fn lessThan(_: void, a: []const u8, b: []const u8) bool {
+            return std.mem.order(u8, a, b) == .lt;
+        }
+    }.lessThan);
+
+    for (names.items) |name| {
+        std.debug.print("{s}\n", .{name});
+    }
+
+    if (names.items.len > max_log) {
+        const to_delete = names.items[0 .. names.items.len - max_log];
+        for (to_delete) |name| {
+            const path = try std.Io.Dir.path.join(allocator, &.{ self.log_dir, name });
+            defer allocator.free(path);
+            try std.Io.Dir.deleteFileAbsolute(io, path);
+        }
+    }
 }
 
 pub fn deinit(self: *Config, allocator: std.mem.Allocator) void {
