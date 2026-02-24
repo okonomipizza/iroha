@@ -96,7 +96,10 @@ pub fn main(init: std.process.Init) !void {
     );
     defer claude.deinit(gpa);
 
-    const res = try claude.call(gpa, init.io, input.items);
+    const res = claude.call(gpa, init.io, input.items) catch |err| {
+        std.debug.print("Error occurred while calling API: {}\n", .{err});
+        std.process.exit(1);
+    };
     defer gpa.free(res);
 
     // Print response from Claude API

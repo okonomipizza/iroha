@@ -259,14 +259,37 @@ pub const ClaudeResponse = struct {
     usage: Usage,
 };
 
+pub const ClaudeError = struct {
+    type: []const u8,
+    message: []const u8,
+};
+
+pub const ErrorResponse = struct {
+    type: []const u8,
+    @"error": ClaudeError,
+    request_id: []const u8,
+};
+
 fn extractResponse(allocator: std.mem.Allocator, response_text: []const u8) ![]u8 {
     const parsed = std.json.parseFromSlice(
         ClaudeResponse,
         allocator,
         response_text,
         .{ .allocate = .alloc_always, .ignore_unknown_fields = true },
-    ) catch {
-        return error.InvalidRequest;
+    ) catch |err| {
+        if (std.json.parseFromSlice(
+            ErrorResponse,
+            allocator,
+            response_text,
+            .{ .allocate = .alloc_always, .ignore_unknown_fields = true },
+        )) |err_parsed| {
+            defer err_parsed.deinit();
+            std.debug.print("API Error [{s}]: {s}\n", .{
+                err_parsed.value.@"error".type,
+                err_parsed.value.@"error".message,
+            });
+        } else |_| {}
+        return err;
     };
     defer parsed.deinit();
 
