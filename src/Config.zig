@@ -152,10 +152,6 @@ pub fn deleteOldLogFiles(self: Config, io: std.Io, allocator: std.mem.Allocator)
         }
     }.lessThan);
 
-    for (names.items) |name| {
-        std.debug.print("{s}\n", .{name});
-    }
-
     if (names.items.len > max_log) {
         const to_delete = names.items[0 .. names.items.len - max_log];
         for (to_delete) |name| {
